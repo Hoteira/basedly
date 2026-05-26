@@ -3,6 +3,8 @@ export interface WorkspaceConfig {
   name: string;
   color?: string;
   connection_hint: string;
+  db_type: 'postgres' | 'sqlite';
+  // connection_string intentionally omitted from frontend type
 }
 
 export interface ForeignKeyInfo {

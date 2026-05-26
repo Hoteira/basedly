@@ -81,6 +81,9 @@ export const ipc = {
 
   testConnection: (connectionString: string) =>
     invoke<void>("test_connection", { connectionString }),
+
+  pickSqliteFile: () =>
+    invoke<string | null>("pick_sqlite_file"),
 };
 
 export function getPrimaryKey(columns: ColumnInfo[]): ColumnInfo | undefined {

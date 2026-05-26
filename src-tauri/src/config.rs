@@ -1,4 +1,3 @@
-use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -9,6 +8,13 @@ pub struct WorkspaceConfig {
     pub name: String,
     pub color: Option<String>,
     pub connection_hint: String,
+    pub connection_string: String,
+    #[serde(default = "default_db_type")]
+    pub db_type: String, // "postgres" | "sqlite"
+}
+
+fn default_db_type() -> String {
+    "postgres".to_string()
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -38,26 +44,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     }
     let data = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     fs::write(&path, data).map_err(|e| e.to_string())
-}
-
-pub fn store_credentials(workspace_id: &str, conn_str: &str) -> Result<(), String> {
-    Entry::new("basedly", workspace_id)
-        .map_err(|e| e.to_string())?
-        .set_password(conn_str)
-        .map_err(|e| e.to_string())
-}
-
-pub fn get_credentials(workspace_id: &str) -> Result<String, String> {
-    Entry::new("basedly", workspace_id)
-        .map_err(|e| e.to_string())?
-        .get_password()
-        .map_err(|e| format!("Could not retrieve credentials for workspace '{}': {}", workspace_id, e))
-}
-
-pub fn delete_credentials(workspace_id: &str) {
-    if let Ok(entry) = Entry::new("basedly", workspace_id) {
-        let _ = entry.delete_credential();
-    }
 }
 
 pub fn mask_connection_string(conn_str: &str) -> String {

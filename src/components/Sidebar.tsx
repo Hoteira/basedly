@@ -133,6 +133,12 @@ export default function Sidebar({
                 >
                   {ws.name}
                 </span>
+                <span
+                  title={ws.db_type === "sqlite" ? "SQLite" : "PostgreSQL"}
+                  style={{ fontSize: 9, color: "var(--text-3)", flexShrink: 0 }}
+                >
+                  {ws.db_type === "sqlite" ? "sq" : "pg"}
+                </span>
               </button>
               {hoveredWs === ws.id && (
                 <button

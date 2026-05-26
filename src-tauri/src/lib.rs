@@ -27,21 +27,25 @@ async fn add_workspace(
     color: Option<String>,
 ) -> Result<config::WorkspaceConfig, String> {
     let id = uuid::Uuid::new_v4().to_string();
+    let db_type = if db::is_postgres(&connection_string) {
+        "postgres".to_string()
+    } else {
+        "sqlite".to_string()
+    };
     let hint = config::mask_connection_string(&connection_string);
-
-    config::store_credentials(&id, &connection_string)?;
 
     let workspace = config::WorkspaceConfig {
         id: id.clone(),
         name,
         color,
         connection_hint: hint,
+        connection_string,
+        db_type,
     };
 
     let mut cfg = state.app_config.lock().map_err(|e| e.to_string())?;
     cfg.workspaces.push(workspace.clone());
     config::save_config(&cfg)?;
-
     Ok(workspace)
 }
 
@@ -51,8 +55,6 @@ async fn delete_workspace(
     workspace_id: String,
 ) -> Result<(), String> {
     state.db_manager.disconnect(&workspace_id);
-    config::delete_credentials(&workspace_id);
-
     let mut cfg = state.app_config.lock().map_err(|e| e.to_string())?;
     cfg.workspaces.retain(|w| w.id != workspace_id);
     config::save_config(&cfg)
@@ -63,7 +65,15 @@ async fn connect_workspace(
     state: State<'_, AppState>,
     workspace_id: String,
 ) -> Result<(), String> {
-    let conn_str = config::get_credentials(&workspace_id)?;
+    let conn_str = state
+        .app_config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .workspaces
+        .iter()
+        .find(|w| w.id == workspace_id)
+        .map(|w| w.connection_string.clone())
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
     state.db_manager.connect(&workspace_id, &conn_str).await
 }
 
@@ -91,8 +101,7 @@ async fn get_schema(
     state: State<'_, AppState>,
     workspace_id: String,
 ) -> Result<Vec<TableInfo>, String> {
-    let pool = state.db_manager.get_pool(&workspace_id)?;
-    db::get_schema(&pool).await
+    state.db_manager.get_schema(&workspace_id).await
 }
 
 #[tauri::command]
@@ -105,16 +114,10 @@ async fn query_table(
     sort_col: Option<String>,
     sort_asc: bool,
 ) -> Result<TablePage, String> {
-    let pool = state.db_manager.get_pool(&workspace_id)?;
-    db::query_table(
-        &pool,
-        &table_name,
-        offset,
-        limit,
-        sort_col.as_deref(),
-        sort_asc,
-    )
-    .await
+    state
+        .db_manager
+        .query_table(&workspace_id, &table_name, offset, limit, sort_col.as_deref(), sort_asc)
+        .await
 }
 
 #[tauri::command]
@@ -128,17 +131,10 @@ async fn update_row(
     update_val: Value,
     col_type: String,
 ) -> Result<(), String> {
-    let pool = state.db_manager.get_pool(&workspace_id)?;
-    db::update_row(
-        &pool,
-        &table_name,
-        &pk_col,
-        &pk_val,
-        &update_col,
-        &update_val,
-        &col_type,
-    )
-    .await
+    state
+        .db_manager
+        .update_row(&workspace_id, &table_name, &pk_col, &pk_val, &update_col, &update_val, &col_type)
+        .await
 }
 
 #[tauri::command]
@@ -149,8 +145,10 @@ async fn delete_row(
     pk_col: String,
     pk_val: String,
 ) -> Result<(), String> {
-    let pool = state.db_manager.get_pool(&workspace_id)?;
-    db::delete_row(&pool, &table_name, &pk_col, &pk_val).await
+    state
+        .db_manager
+        .delete_row(&workspace_id, &table_name, &pk_col, &pk_val)
+        .await
 }
 
 #[tauri::command]
@@ -159,17 +157,25 @@ async fn execute_query(
     workspace_id: String,
     sql: String,
 ) -> Result<Vec<HashMap<String, Value>>, String> {
-    let pool = state.db_manager.get_pool(&workspace_id)?;
-    db::execute_query(&pool, &sql).await
+    state.db_manager.execute_query(&workspace_id, &sql).await
 }
 
 #[tauri::command]
 async fn test_connection(connection_string: String) -> Result<(), String> {
-    let pool = sqlx::PgPool::connect(&connection_string)
-        .await
-        .map_err(|e| e.to_string())?;
-    pool.close().await;
-    Ok(())
+    db::test_connection(&connection_string).await
+}
+
+// ── File picker for SQLite ─────────────────────────────────────────────────────
+
+#[tauri::command]
+fn pick_sqlite_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let result = app
+        .dialog()
+        .file()
+        .add_filter("SQLite Database", &["db", "sqlite", "sqlite3"])
+        .blocking_pick_file();
+    Ok(result.map(|p| p.to_string()))
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────
@@ -183,6 +189,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             get_workspaces,
@@ -197,6 +204,7 @@ pub fn run() {
             delete_row,
             execute_query,
             test_connection,
+            pick_sqlite_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Basedly");
