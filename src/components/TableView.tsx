@@ -27,52 +27,46 @@ export default function TableView({
   const [peekRow, setPeekRow] = useState<Record<string, unknown> | null>(null);
   const [kanbanColName, setKanbanColName] = useState("");
 
-  const enumCols = columns.filter(c => c.enum_values && c.enum_values.length > 0);
-  const canKanban = enumCols.length > 0;
-  const kanbanCol = enumCols.find(c => c.name === kanbanColName) ?? enumCols[0];
+  const nonPkCols = columns.filter(c => !c.is_primary_key);
+  const groupCol = nonPkCols.find(c => c.name === kanbanColName) ?? nonPkCols[0];
+
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    display: "flex", alignItems: "center", gap: 5,
+    padding: "3px 10px", borderRadius: 4, border: "none", cursor: "pointer",
+    fontSize: 11, fontWeight: 500,
+    background: active ? "var(--bg-1)" : "transparent",
+    color: active ? "var(--text-1)" : "var(--text-3)",
+    transition: "background 0.12s, color 0.12s",
+  });
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg-1)", flexShrink: 0 }}>
-        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--text-1)" }}>{tableName}</span>
+      {/* Toolbar — fixed 40px to match sidebar header */}
+      <div style={{
+        height: 40, flexShrink: 0,
+        display: "flex", alignItems: "center", gap: 10, padding: "0 16px",
+        borderBottom: "1px solid var(--border)", background: "var(--bg-1)",
+      }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text-1)" }}>{tableName}</span>
 
-        <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
-          {viewMode === "kanban" && canKanban && enumCols.length > 1 && (
-            <select
-              value={kanbanCol?.name ?? ""}
-              onChange={e => setKanbanColName(e.target.value)}
-              className="input"
-              style={{ padding: "3px 8px", fontSize: 11, height: 28 }}
-            >
-              {enumCols.map(c => (
-                <option key={c.name} value={c.name}>{c.name}</option>
-              ))}
-            </select>
-          )}
-          <button
-            className={`btn ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
-            style={{ padding: "4px 10px", fontSize: 11 }}
-            onClick={() => onViewModeChange("grid")}
-          >
-            <LayoutGrid size={12} /> Grid
-          </button>
-          {canKanban && (
-            <button
-              className={`btn ${viewMode === "kanban" ? "btn-primary" : "btn-ghost"}`}
-              style={{ padding: "4px 10px", fontSize: 11 }}
-              onClick={() => onViewModeChange("kanban")}
-            >
-              <Columns3 size={12} /> Board
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          {/* Segmented toggle */}
+          <div style={{ display: "flex", background: "var(--bg-3)", borderRadius: 6, padding: 2 }}>
+            <button onClick={() => onViewModeChange("grid")} style={btnStyle(viewMode === "grid")}>
+              <LayoutGrid size={11} /> Grid
             </button>
-          )}
+            <button onClick={() => onViewModeChange("kanban")} style={btnStyle(viewMode === "kanban")}>
+              <Columns3 size={11} /> Kanban
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-        {viewMode === "grid" || !canKanban ? (
+        {viewMode === "grid" || !groupCol ? (
           <DataGrid
+            key={tableName}
             workspaceId={workspaceId}
             tableName={tableName}
             columns={columns}
@@ -84,8 +78,9 @@ export default function TableView({
             workspaceId={workspaceId}
             tableName={tableName}
             columns={columns}
-            enumCol={kanbanCol!}
+            groupCol={groupCol}
             onCardOpen={setPeekRow}
+            onGroupColChange={(col) => setKanbanColName(col.name)}
           />
         )}
 

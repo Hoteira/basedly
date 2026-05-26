@@ -9,6 +9,7 @@ import AddWorkspaceModal from "./components/AddWorkspaceModal";
 import Sidebar from "./components/Sidebar";
 import SqlConsole from "./components/SqlConsole";
 import TableView from "./components/TableView";
+import TitleBar from "./components/TitleBar";
 
 // Draws the isometric cube (no background) onto a canvas and returns PNG bytes.
 // These are the same parallelogram faces as the SVG, computed analytically.
@@ -151,7 +152,9 @@ export default function App() {
     schema.find((t) => t.name === activeTable)?.columns ?? [];
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden">
+      <TitleBar />
+      <div className="flex flex-1 overflow-hidden">
       <Sidebar
         workspaces={workspaces}
         activeWsId={activeWsId}
@@ -216,6 +219,8 @@ export default function App() {
         )}
       </main>
 
+      </div>
+
       {showAddWs && (
         <AddWorkspaceModal
           onAdd={handleAddWorkspace}
@@ -235,17 +240,10 @@ function EmptyState({
 }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4">
-      <div
-        style={{
-          fontSize: 48,
-          opacity: 0.12,
-          fontWeight: 700,
-          letterSpacing: "-0.04em",
-        }}
-      >
+      <div className="empty-brand">
         basedly
       </div>
-      <p style={{ color: "var(--text-3)", fontSize: 13 }}>
+      <p style={{ color: "var(--text-2)", fontSize: 13 }}>
         {hasWorkspace
           ? "Select a table from the sidebar"
           : "Connect a PostgreSQL database to get started"}

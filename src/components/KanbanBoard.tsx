@@ -14,7 +14,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { ipc, rowPkValue } from "../ipc";
 import type { ColumnInfo } from "../types";
@@ -23,8 +23,9 @@ interface Props {
   workspaceId: string;
   tableName: string;
   columns: ColumnInfo[];
-  enumCol: ColumnInfo;
+  groupCol: ColumnInfo;
   onCardOpen: (row: Record<string, unknown>) => void;
+  onGroupColChange: (col: ColumnInfo) => void;
 }
 
 function CardContent({
@@ -127,17 +128,43 @@ export default function KanbanBoard({
   workspaceId,
   tableName,
   columns,
-  enumCol,
+  groupCol,
   onCardOpen,
+  onGroupColChange,
 }: Props) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
 
-  const enumValues = enumCol.enum_values ?? [];
+  const nonPkCols = useMemo(() => columns.filter(c => !c.is_primary_key), [columns]);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) closeMenu();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen, closeMenu]);
+
   const pkCol = columns.find((c) => c.is_primary_key);
+
+  // Use declared enum values if available; otherwise derive from loaded rows
+  const laneValues = useMemo(() => {
+    if (groupCol.enum_values?.length) return groupCol.enum_values;
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const row of rows) {
+      const v = String(row[groupCol.name] ?? "");
+      if (v && !seen.has(v)) { seen.add(v); result.push(v); }
+    }
+    return result.sort();
+  }, [rows, groupCol]);
 
   useEffect(() => {
     if (loadingRef.current) return;
@@ -178,18 +205,18 @@ export default function KanbanBoard({
 
     const overId = String(over.id);
     // Check if dropped on a lane (enum value) rather than a card
-    const targetLane = enumValues.find((v) => `lane-${v}` === overId);
+    const targetLane = laneValues.find((v) => `lane-${v}` === overId);
     const cardLane = targetLane ?? (() => {
       // Find which lane the over-card belongs to
       const overRow = rows.find((r) => getRowId(r) === overId);
-      return overRow ? String(overRow[enumCol.name] ?? "") : null;
+      return overRow ? String(overRow[groupCol.name] ?? "") : null;
     })();
 
     if (!cardLane) return;
 
     const draggedRow = rows.find((r) => getRowId(r) === String(active.id));
     if (!draggedRow) return;
-    if (String(draggedRow[enumCol.name]) === cardLane) return;
+    if (String(draggedRow[groupCol.name]) === cardLane) return;
 
     if (!pkCol) return;
     const pk = rowPkValue(draggedRow, columns);
@@ -198,7 +225,7 @@ export default function KanbanBoard({
     setRows((prev) =>
       prev.map((r) =>
         getRowId(r) === String(active.id)
-          ? { ...r, [enumCol.name]: cardLane }
+          ? { ...r, [groupCol.name]: cardLane }
           : r
       )
     );
@@ -209,16 +236,16 @@ export default function KanbanBoard({
         tableName,
         pkCol.name,
         pk,
-        enumCol.name,
+        groupCol.name,
         cardLane,
-        enumCol.data_type
+        groupCol.data_type
       );
     } catch (e) {
       // Rollback
       setRows((prev) =>
         prev.map((r) =>
           getRowId(r) === String(active.id)
-            ? { ...r, [enumCol.name]: draggedRow[enumCol.name] }
+            ? { ...r, [groupCol.name]: draggedRow[groupCol.name] }
             : r
         )
       );
@@ -250,19 +277,20 @@ export default function KanbanBoard({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div
         style={{
+          flex: 1,
           display: "flex",
           gap: 16,
           padding: 20,
           overflow: "auto",
-          height: "100%",
           alignItems: "flex-start",
         }}
       >
-        {enumValues.map((lane) => {
+        {laneValues.map((lane) => {
           const laneRows = rows.filter(
-            (r) => String(r[enumCol.name] ?? "") === lane
+            (r) => String(r[groupCol.name] ?? "") === lane
           );
           const ids = laneRows.map(getRowId);
 
@@ -351,6 +379,94 @@ export default function KanbanBoard({
         })}
       </div>
 
+      {/* Footer — flex child, always visible at bottom */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: "var(--bg-1)",
+          borderTop: "1px solid var(--border)",
+          padding: "5px 14px",
+          fontSize: 11,
+          color: "var(--text-3)",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        <span>{rows.length} / {totalCount} rows · grouped by</span>
+
+        {/* Clickable column name — opens upward picker */}
+        <div ref={menuRef} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--accent)",
+              fontSize: 11,
+              padding: "0 2px",
+              borderRadius: 3,
+              lineHeight: 1,
+            }}
+          >
+            {groupCol.name} ▴
+          </button>
+
+          {menuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "calc(100% + 6px)",
+                left: 0,
+                background: "var(--bg-2)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: 7,
+                padding: "4px 0",
+                minWidth: 180,
+                maxHeight: 240,
+                overflowY: "auto",
+                zIndex: 200,
+                boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
+              }}
+            >
+              {nonPkCols.map(col => (
+                <button
+                  key={col.name}
+                  onClick={() => { onGroupColChange(col); closeMenu(); }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "6px 12px",
+                    background: col.name === groupCol.name ? "var(--bg-3)" : "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: col.name === groupCol.name ? "var(--text-1)" : "var(--text-2)",
+                    fontSize: 12,
+                    gap: 8,
+                  }}
+                >
+                  {col.name === groupCol.name && (
+                    <span style={{ color: "var(--accent)", fontSize: 9 }}>✓</span>
+                  )}
+                  {col.name !== groupCol.name && <span style={{ width: 12 }} />}
+                  {col.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {totalCount > 500 && (
+          <span style={{ marginLeft: 4, color: "var(--yellow)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <AlertTriangle size={11} /> showing first 500
+          </span>
+        )}
+      </div>
+      </div>
+
       <DragOverlay>
         {activeRow && (
           <div
@@ -365,29 +481,6 @@ export default function KanbanBoard({
           </div>
         )}
       </DragOverlay>
-
-      {/* Footer */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 220,
-          right: 0,
-          background: "var(--bg-1)",
-          borderTop: "1px solid var(--border)",
-          padding: "5px 20px",
-          fontSize: 11,
-          color: "var(--text-3)",
-        }}
-      >
-        {rows.length} / {totalCount} rows · grouped by{" "}
-        <span style={{ color: "var(--accent)" }}>{enumCol.name}</span>
-        {totalCount > 500 && (
-          <span style={{ marginLeft: 8, color: "var(--yellow)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <AlertTriangle size={11} /> showing first 500
-          </span>
-        )}
-      </div>
     </DndContext>
   );
 }

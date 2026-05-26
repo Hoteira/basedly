@@ -164,6 +164,16 @@ body,
 /* ── Brand icon face fill (uses sidebar bg so faces hide each other) ────────── */
 .brand-face-fill { fill: var(--bg-1); }
 
+/* ── Empty state watermark ────────────────────────────────────────────────────── */
+.empty-brand {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  opacity: 0.12;
+  color: var(--text-1);
+}
+[data-theme="light"] .empty-brand { opacity: 0.30; }
+
 /* ── Light theme — Notion white ─────────────────────────────────────────────── */
 
 [data-theme="light"] {
@@ -172,8 +182,8 @@ body,
   --bg-2: #efeeec;
   --bg-3: #e6e5e3;
   --bg-4: #d8d7d4;
-  --border: rgba(0, 0, 0, 0.06);
-  --border-strong: rgba(0, 0, 0, 0.11);
+  --border: rgba(0, 0, 0, 0.11);
+  --border-strong: rgba(0, 0, 0, 0.20);
   --text-1: #37352f;
   --text-2: #787774;
   --text-3: #acaba9;
@@ -194,3 +204,5 @@ body,
 [data-theme="light"] .type-default { background: rgba(0, 0, 0, 0.05);       color: var(--text-3); }
 
 [data-theme="light"] .brand-face-fill { fill: var(--bg-1); }
+
+[data-theme="light"] thead tr { background: var(--bg-2) !important; }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ipc, rowPkValue } from "../ipc";
@@ -73,7 +73,11 @@ export default function DataGrid({
   const loadingRef = useRef(false);
   const offsetRef = useRef(0);
 
-  const colWidths = columns.map(colWidth);
+  // Resizable column widths
+  const [widths, setWidths] = useState<number[]>(() => columns.map(colWidth));
+  const containerWidthRef = useRef(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const initializedRef = useRef(false);
 
   const loadPage = useCallback(
     async (offset: number, reset: boolean) => {
@@ -154,6 +158,63 @@ export default function DataGrid({
     return () => window.removeEventListener("keydown", handler);
   }, [editing, selectedRow, rows, onRowOpen]);
 
+  // Measure container; scale columns to fill on first mount
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const cw = entry.contentRect.width;
+      containerWidthRef.current = cw;
+      setContainerWidth(cw);
+      if (!initializedRef.current && cw > 0) {
+        initializedRef.current = true;
+        const natural = columns.map(colWidth);
+        const sum = natural.reduce((a, b) => a + b, 0);
+        const available = cw - 48;
+        if (available > 0 && sum < available) {
+          setWidths(natural.map(w => Math.floor(w * (available / sum))));
+        }
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Last column stretches to fill remaining container space
+  const adjustedWidths = useMemo(() => {
+    if (!widths.length) return widths;
+    const sum = widths.reduce((a, b) => a + b, 0);
+    const available = containerWidth - 48;
+    if (containerWidth > 0 && sum < available) {
+      const extra = available - sum;
+      return widths.map((w, i) => i === widths.length - 1 ? w + extra : w);
+    }
+    return widths;
+  }, [widths, containerWidth]);
+
+  // Drag handle between col[i] and col[i+1]: resizes col[i+1], col[i] stays fixed
+  const handleResizeMouseDown = (e: React.MouseEvent, targetIdx: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = widths[targetIdx];
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      const newW = Math.max(COL_MIN, startW + (ev.clientX - startX));
+      setWidths(prev => prev.map((w, i) => i === targetIdx ? newW : w));
+    };
+    const onUp = () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   const startEdit = (rowIdx: number, colName: string, currentVal: unknown) => {
     setEditing({ rowIdx, colName });
     setEditVal(currentVal == null ? "" : String(currentVal));
@@ -214,14 +275,15 @@ export default function DataGrid({
     }
   };
 
-  const totalWidth = 48 + colWidths.reduce((a, b) => a + b, 0);
+  const totalWidth = Math.max(containerWidth || 0, 48 + (adjustedWidths.length ? adjustedWidths.reduce((a, b) => a + b, 0) : 0));
 
   return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
     <div
       ref={scrollRef}
       style={{
         overflow: "auto",
-        height: "100%",
+        flex: 1,
         width: "100%",
         position: "relative",
       }}
@@ -229,7 +291,6 @@ export default function DataGrid({
       <table
         style={{
           borderCollapse: "collapse",
-          minWidth: totalWidth,
           tableLayout: "fixed",
           width: totalWidth,
         }}
@@ -243,7 +304,7 @@ export default function DataGrid({
               <th
                 key={col.name}
                 style={{
-                  width: colWidths[i],
+                  width: adjustedWidths[i] ?? COL_MIN,
                   padding: "8px 10px",
                   textAlign: "left",
                   fontWeight: 500,
@@ -255,6 +316,7 @@ export default function DataGrid({
                   userSelect: "none",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
+                  position: "relative",
                 }}
                 onClick={() => handleSort(col.name)}
               >
@@ -281,6 +343,19 @@ export default function DataGrid({
                     </span>
                   )}
                 </span>
+                {i < columns.length - 1 && (
+                  <div
+                    onMouseDown={(e) => handleResizeMouseDown(e, i)}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--accent)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    style={{
+                      position: "absolute", right: 0, top: 0, bottom: 0, width: 5,
+                      cursor: "col-resize", zIndex: 2, background: "transparent",
+                      transition: "background 0.1s",
+                    }}
+                  />
+                )}
               </th>
             ))}
           </tr>
@@ -314,7 +389,7 @@ export default function DataGrid({
                   background: isSelected
                     ? "var(--accent-subtle)"
                     : hoveredRow === vRow.index
-                    ? "rgba(255,255,255,0.025)"
+                    ? "var(--bg-2)"
                     : "transparent",
                   borderBottom: "1px solid var(--border)",
                   cursor: "default",
@@ -373,8 +448,8 @@ export default function DataGrid({
                         !isPk && startEdit(vRow.index, col.name, val)
                       }
                       style={{
-                        width: colWidths[ci],
-                        maxWidth: colWidths[ci],
+                        width: adjustedWidths[ci] ?? COL_MIN,
+                        maxWidth: adjustedWidths[ci] ?? COL_MIN,
                         padding: "0 10px",
                         fontSize: 12,
                         color:
@@ -392,6 +467,7 @@ export default function DataGrid({
                             ? "var(--font-mono, monospace)"
                             : "inherit",
                         cursor: isPk ? "default" : "text",
+                        position: "relative",
                       }}
                     >
                       {isEditing ? (
@@ -434,6 +510,19 @@ export default function DataGrid({
                       ) : (
                         formatCell(val, col.data_type)
                       )}
+                      {ci < columns.length - 1 && (
+                        <div
+                          onMouseDown={(e) => handleResizeMouseDown(e, ci)}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--accent)"; (e.currentTarget as HTMLElement).style.opacity = "0.5"; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                          style={{
+                            position: "absolute", right: 0, top: 0, bottom: 0, width: 5,
+                            cursor: "col-resize", zIndex: 2, background: "transparent",
+                            transition: "background 0.1s",
+                          }}
+                        />
+                      )}
                     </td>
                   );
                 })}
@@ -454,12 +543,12 @@ export default function DataGrid({
         </tbody>
       </table>
 
-      {/* Status bar */}
+    </div>
+
+      {/* Status bar — outside scroll container so it's always visible */}
       <div
         style={{
-          position: "sticky",
-          bottom: 0,
-          left: 0,
+          flexShrink: 0,
           background: "var(--bg-1)",
           borderTop: "1px solid var(--border)",
           padding: "5px 14px",

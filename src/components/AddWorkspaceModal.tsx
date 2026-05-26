@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, Database, HardDrive, X } from "lucide-react";
+import { Check, X } from "lucide-react";
+import { SiPostgresql, SiSqlite } from "react-icons/si";
 import { ipc } from "../ipc";
 import type { WorkspaceConfig } from "../types";
 
@@ -115,11 +116,12 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
                 background: mode === m ? "var(--bg-1)" : "transparent",
                 color: mode === m ? "var(--text-1)" : "var(--text-3)",
                 transition: "all 0.15s",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               }}
             >
               {m === "postgres"
-                ? <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Database size={13} /> PostgreSQL</span>
-                : <span style={{ display: "flex", alignItems: "center", gap: 5 }}><HardDrive size={13} /> SQLite / File</span>
+                ? <><SiPostgresql size={14} color="#336791" /> PostgreSQL</>
+                : <><SiSqlite size={14} color="#003B57" /> SQLite / File</>
               }
             </button>
           ))}

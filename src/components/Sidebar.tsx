@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Database, HardDrive, Moon, Plus, Sun, Terminal, X } from "lucide-react";
+import { Moon, Plus, Sun, Terminal, X } from "lucide-react";
+import { SiPostgresql, SiSqlite } from "react-icons/si";
 import type { TableInfo, WorkspaceConfig } from "../types";
 
 function BrandIcon({ size = 18 }: { size?: number }) {
@@ -74,7 +75,8 @@ export default function Sidebar({
       {/* Header */}
       <div
         style={{
-          padding: "12px 12px 10px",
+          height: 40,
+          padding: "0 12px",
           borderBottom: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
@@ -166,7 +168,7 @@ export default function Sidebar({
                   title={ws.db_type === "sqlite" ? "SQLite" : "PostgreSQL"}
                   style={{ color: "var(--text-3)", flexShrink: 0, display: "flex", alignItems: "center" }}
                 >
-                  {ws.db_type === "sqlite" ? <HardDrive size={10} /> : <Database size={10} />}
+                  {ws.db_type === "sqlite" ? <SiSqlite size={10} /> : <SiPostgresql size={10} />}
                 </span>
               </button>
               {hoveredWs === ws.id && (
@@ -209,7 +211,7 @@ export default function Sidebar({
             background: "transparent",
             border: "none",
             cursor: "pointer",
-            color: "var(--text-3)",
+            color: "var(--text-2)",
             fontSize: 12,
             marginTop: 2,
           }}
