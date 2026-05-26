@@ -15,6 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { ipc, rowPkValue } from "../ipc";
 import type { ColumnInfo } from "../types";
 
@@ -86,7 +87,7 @@ function CardContent({
           padding: "2px 0",
         }}
       >
-        ↗ open
+        <span style={{ display: "flex", alignItems: "center", gap: 3 }}><ArrowUpRight size={11} /> open</span>
       </button>
     </div>
   );
@@ -382,8 +383,8 @@ export default function KanbanBoard({
         {rows.length} / {totalCount} rows · grouped by{" "}
         <span style={{ color: "var(--accent)" }}>{enumCol.name}</span>
         {totalCount > 500 && (
-          <span style={{ marginLeft: 8, color: "var(--yellow)" }}>
-            ⚠ showing first 500
+          <span style={{ marginLeft: 8, color: "var(--yellow)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <AlertTriangle size={11} /> showing first 500
           </span>
         )}
       </div>

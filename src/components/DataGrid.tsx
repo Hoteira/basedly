@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ipc, rowPkValue } from "../ipc";
 import type { ColumnInfo } from "../types";
@@ -351,7 +352,7 @@ export default function DataGrid({
                         "var(--text-3)")
                     }
                   >
-                    ↗
+                    <ArrowUpRight size={13} />
                   </button>
                 </td>
 

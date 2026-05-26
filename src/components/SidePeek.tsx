@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ArrowRight, Check, ChevronLeft, Copy, Pencil, X } from "lucide-react";
 import { ipc, rowPkValue } from "../ipc";
 import type { ColumnInfo, ForeignKeyInfo, TableInfo } from "../types";
 
@@ -154,11 +155,11 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
             ))}
           </div>
           {stack.length > 0 && (
-            <button className="btn btn-ghost" style={{ padding: "3px 8px", fontSize: 11 }} onClick={() => setStack(s => s.slice(0, -1))}>
-              ← back
+            <button className="btn btn-ghost" style={{ padding: "3px 8px", fontSize: 11, display: "flex", alignItems: "center", gap: 3 }} onClick={() => setStack(s => s.slice(0, -1))}>
+              <ChevronLeft size={13} /> back
             </button>
           )}
-          <button className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={onClose}><X size={14} /></button>
         </div>
 
         {/* Fields */}
@@ -191,20 +192,24 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
                         opacity: val == null ? 0.4 : 1,
                       }}
                     >
-                      {fkLoading === fkKey ? "…" : `→ ${col.foreign_key.foreign_table}`}
+                      {fkLoading === fkKey
+                        ? "…"
+                        : <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><ArrowRight size={9} />{col.foreign_key.foreign_table}</span>
+                      }
                     </button>
                   )}
 
                   <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                    <button onClick={() => copy(val, col.name)} style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === col.name ? "var(--green)" : "var(--text-3)", fontSize: 10, padding: "2px 4px" }}>
-                      {copied === col.name ? "✓ copied" : "copy"}
+                    <button onClick={() => copy(val, col.name)} title="Copy" style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === col.name ? "var(--green)" : "var(--text-3)", padding: "2px 4px", display: "flex", alignItems: "center" }}>
+                      {copied === col.name ? <Check size={11} /> : <Copy size={11} />}
                     </button>
                     {!isPk && !isBool && !isJson && (
                       <button
                         onClick={() => isEditing ? commitEdit(col) : startEdit(col, val)}
-                        style={{ background: "transparent", border: "none", cursor: "pointer", color: isEditing ? "var(--green)" : "var(--text-3)", fontSize: 10, padding: "2px 4px" }}
+                        title={isEditing ? "Save" : "Edit"}
+                        style={{ background: "transparent", border: "none", cursor: "pointer", color: isEditing ? "var(--green)" : "var(--text-3)", padding: "2px 4px", display: "flex", alignItems: "center" }}
                       >
-                        {isEditing ? "save" : "edit"}
+                        {isEditing ? <Check size={11} /> : <Pencil size={11} />}
                       </button>
                     )}
                   </div>

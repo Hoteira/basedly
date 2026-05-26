@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Check, Database, HardDrive, X } from "lucide-react";
 import { ipc } from "../ipc";
 import type { WorkspaceConfig } from "../types";
 
@@ -94,7 +95,7 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ fontSize: 15, fontWeight: 600 }}>Add connection</h2>
-          <button className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={onClose}><X size={14} /></button>
         </div>
 
         {/* DB type tabs */}
@@ -116,7 +117,10 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
                 transition: "all 0.15s",
               }}
             >
-              {m === "postgres" ? "🐘 PostgreSQL" : "🗄 SQLite / File"}
+              {m === "postgres"
+                ? <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Database size={13} /> PostgreSQL</span>
+                : <span style={{ display: "flex", alignItems: "center", gap: 5 }}><HardDrive size={13} /> SQLite / File</span>
+              }
             </button>
           ))}
         </div>
@@ -183,7 +187,7 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
               {testing ? "Testing…" : "Test connection"}
             </button>
             {testResult === "ok" && (
-              <span style={{ fontSize: 11, color: "var(--green)" }}>✓ Connected</span>
+              <span style={{ fontSize: 11, color: "var(--green)", display: "flex", alignItems: "center", gap: 4 }}><Check size={12} /> Connected</span>
             )}
             {testResult === "error" && (
               <span

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Database, HardDrive, Moon, Plus, Sun, Terminal, X } from "lucide-react";
 import type { TableInfo, WorkspaceConfig } from "../types";
 
 function BrandIcon({ size = 18 }: { size?: number }) {
@@ -95,7 +96,7 @@ export default function Sidebar({
             borderRadius: 4, lineHeight: 1,
           }}
         >
-          {theme === "dark" ? "☀" : "☾"}
+          {theme === "dark" ? <Sun size={13} /> : <Moon size={13} />}
         </button>
       </div>
 
@@ -163,9 +164,9 @@ export default function Sidebar({
                 </span>
                 <span
                   title={ws.db_type === "sqlite" ? "SQLite" : "PostgreSQL"}
-                  style={{ fontSize: 9, color: "var(--text-3)", flexShrink: 0 }}
+                  style={{ color: "var(--text-3)", flexShrink: 0, display: "flex", alignItems: "center" }}
                 >
-                  {ws.db_type === "sqlite" ? "sq" : "pg"}
+                  {ws.db_type === "sqlite" ? <HardDrive size={10} /> : <Database size={10} />}
                 </span>
               </button>
               {hoveredWs === ws.id && (
@@ -189,7 +190,7 @@ export default function Sidebar({
                     borderRadius: 4,
                   }}
                 >
-                  ✕
+                  <X size={12} />
                 </button>
               )}
             </div>
@@ -213,7 +214,7 @@ export default function Sidebar({
             marginTop: 2,
           }}
         >
-          <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
+          <Plus size={14} />
           <span>New connection</span>
         </button>
       </div>
@@ -322,7 +323,7 @@ export default function Sidebar({
               fontFamily: "JetBrains Mono, monospace",
             }}
           >
-            <span style={{ fontSize: 11 }}>&gt;_</span>
+            <Terminal size={11} />
             <span>SQL Console</span>
           </button>
         </div>

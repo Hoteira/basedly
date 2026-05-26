@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Columns3, LayoutGrid } from "lucide-react";
 import type { ColumnInfo, TableInfo, ViewMode } from "../types";
 import DataGrid from "./DataGrid";
 import KanbanBoard from "./KanbanBoard";
@@ -54,7 +55,7 @@ export default function TableView({
             style={{ padding: "4px 10px", fontSize: 11 }}
             onClick={() => onViewModeChange("grid")}
           >
-            ▦ Grid
+            <LayoutGrid size={12} /> Grid
           </button>
           {canKanban && (
             <button
@@ -62,7 +63,7 @@ export default function TableView({
               style={{ padding: "4px 10px", fontSize: 11 }}
               onClick={() => onViewModeChange("kanban")}
             >
-              ⬜ Board
+              <Columns3 size={12} /> Board
             </button>
           )}
         </div>

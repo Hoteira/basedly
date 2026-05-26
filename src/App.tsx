@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Image as TauriImage } from "@tauri-apps/api/image";
@@ -178,14 +179,14 @@ export default function App() {
               color: "var(--red)",
             }}
           >
-            <span>⚠</span>
+            <AlertTriangle size={13} />
             <span>{error}</span>
             <button
               className="ml-auto btn-ghost"
-              style={{ padding: "2px 6px", fontSize: 11 }}
+              style={{ padding: "2px 6px", display: "flex", alignItems: "center" }}
               onClick={() => setError(null)}
             >
-              ✕
+              <X size={12} />
             </button>
           </div>
         )}

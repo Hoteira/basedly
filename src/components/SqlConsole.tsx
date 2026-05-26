@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Terminal, X } from "lucide-react";
 import { ipc } from "../ipc";
 
 interface Props {
@@ -37,12 +38,12 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
     <div style={{ borderTop: "2px solid var(--border)", background: "var(--bg-1)", display: "flex", flexDirection: "column", height: 300, flexShrink: 0 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-2)", flexShrink: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", fontFamily: "JetBrains Mono, monospace" }}>&gt;_ SQL Console</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", display: "flex", alignItems: "center", gap: 5 }}><Terminal size={12} /> SQL Console</span>
         <button
           onClick={onClose}
-          style={{ marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-3)", fontSize: 12, padding: "2px 4px" }}
+          style={{ marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-3)", padding: "2px 4px", display: "flex", alignItems: "center" }}
         >
-          ✕
+          <X size={14} />
         </button>
       </div>
 
