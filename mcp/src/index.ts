@@ -5,7 +5,6 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import express from "express";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -397,18 +396,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 const transport = new StreamableHTTPServerTransport({
-  sessionIdGenerator: undefined, // stateless — no session bookkeeping needed
+  sessionIdGenerator: () => crypto.randomUUID(),
 });
 
 const app = createMcpExpressApp();
-app.use(express.json());
 app.all("/mcp", async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
 await server.connect(transport);
 
-const PORT = parseInt(process.env["PORT"] ?? "3456", 10);
+const PORT = parseInt(process.env["PORT"] ?? "8453", 10);
 app.listen(PORT, "127.0.0.1", () => {
   console.error(`Basedly MCP running at http://localhost:${PORT}/mcp`);
 });

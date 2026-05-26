@@ -233,7 +233,7 @@ pub fn run() {
                     Ok(child) => {
                         let s = app.state::<AppState>();
                         *s.mcp_server.lock().unwrap() = Some(child);
-                        eprintln!("[basedly] MCP server → http://localhost:3456/mcp");
+                        eprintln!("[basedly] MCP server → http://localhost:8453/mcp");
                     }
                     Err(e) => eprintln!("[basedly] MCP server failed to start: {e}"),
                 }
