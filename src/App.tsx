@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { ipc } from "./ipc";
 import type { ColumnInfo, TableInfo, ViewMode, WorkspaceConfig } from "./types";
 import AddWorkspaceModal from "./components/AddWorkspaceModal";
@@ -15,12 +16,26 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showAddWs, setShowAddWs] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
 
   useEffect(() => {
     ipc.getWorkspaces().then(setWorkspaces).catch(console.error);
   }, []);
+
+  // Live reload when SQLite file changes on disk
+  useEffect(() => {
+    if (!activeWsId) return;
+    const wsId = activeWsId;
+    let unlisten: (() => void) | undefined;
+    listen<string>("db-file-changed", (event) => {
+      if (event.payload !== wsId) return;
+      setRefreshKey((k) => k + 1);
+      ipc.getSchema(wsId).then(setSchema).catch(console.error);
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, [activeWsId]);
 
   const handleSelectWorkspace = useCallback(
     async (ws: WorkspaceConfig) => {
@@ -127,6 +142,7 @@ export default function App() {
             columns={activeColumns}
             schema={schema}
             viewMode={viewMode}
+            refreshKey={refreshKey}
             onViewModeChange={setViewMode}
           />
         ) : (

@@ -62,6 +62,7 @@ async fn delete_workspace(
 
 #[tauri::command]
 async fn connect_workspace(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     workspace_id: String,
 ) -> Result<(), String> {
@@ -74,7 +75,11 @@ async fn connect_workspace(
         .find(|w| w.id == workspace_id)
         .map(|w| w.connection_string.clone())
         .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
-    state.db_manager.connect(&workspace_id, &conn_str).await
+    state.db_manager.connect(&workspace_id, &conn_str).await?;
+    if !db::is_postgres(&conn_str) {
+        state.db_manager.start_sqlite_watch(&workspace_id, &conn_str, app);
+    }
+    Ok(())
 }
 
 #[tauri::command]

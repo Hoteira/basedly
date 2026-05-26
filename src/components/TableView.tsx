@@ -10,6 +10,7 @@ interface Props {
   columns: ColumnInfo[];
   schema: TableInfo[];
   viewMode: ViewMode;
+  refreshKey: number;
   onViewModeChange: (mode: ViewMode) => void;
 }
 
@@ -19,6 +20,7 @@ export default function TableView({
   columns,
   schema,
   viewMode,
+  refreshKey,
   onViewModeChange,
 }: Props) {
   const [peekRow, setPeekRow] = useState<Record<string, unknown> | null>(null);
@@ -73,6 +75,7 @@ export default function TableView({
             workspaceId={workspaceId}
             tableName={tableName}
             columns={columns}
+            refreshKey={refreshKey}
             onRowOpen={setPeekRow}
           />
         ) : (

@@ -12,6 +12,7 @@ interface Props {
   workspaceId: string;
   tableName: string;
   columns: ColumnInfo[];
+  refreshKey: number;
   onRowOpen: (row: Record<string, unknown>) => void;
 }
 
@@ -54,6 +55,7 @@ export default function DataGrid({
   workspaceId,
   tableName,
   columns,
+  refreshKey,
   onRowOpen,
 }: Props) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
@@ -102,13 +104,14 @@ export default function DataGrid({
     [workspaceId, tableName, sortCol, sortAsc]
   );
 
-  // Reload when table/sort changes
+  // Reload when table/sort changes or external file change detected
   useEffect(() => {
     offsetRef.current = 0;
     setRows([]);
     setSelectedRow(null);
     loadPage(0, true);
-  }, [workspaceId, tableName, sortCol, sortAsc, loadPage]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, tableName, sortCol, sortAsc, loadPage, refreshKey]);
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,

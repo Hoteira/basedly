@@ -171,28 +171,30 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
           </div>
         )}
 
-        {/* Test */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button
-            className="btn btn-ghost"
-            style={{ fontSize: 11, padding: "4px 10px", border: "1px solid var(--border)" }}
-            onClick={handleTest}
-            disabled={testing || !effectiveConnStr.trim()}
-          >
-            {testing ? "Testing…" : "Test connection"}
-          </button>
-          {testResult === "ok" && (
-            <span style={{ fontSize: 11, color: "var(--green)" }}>✓ Connected</span>
-          )}
-          {testResult === "error" && (
-            <span
-              style={{ fontSize: 11, color: "var(--red)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              title={testError}
+        {/* Test — only for Postgres; SQLite just needs the file path */}
+        {mode === "postgres" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              className="btn btn-ghost"
+              style={{ fontSize: 11, padding: "4px 10px", border: "1px solid var(--border)" }}
+              onClick={handleTest}
+              disabled={testing || !effectiveConnStr.trim()}
             >
-              ✗ {testError.slice(0, 60)}
-            </span>
-          )}
-        </div>
+              {testing ? "Testing…" : "Test connection"}
+            </button>
+            {testResult === "ok" && (
+              <span style={{ fontSize: 11, color: "var(--green)" }}>✓ Connected</span>
+            )}
+            {testResult === "error" && (
+              <span
+                style={{ fontSize: 11, color: "var(--red)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                title={testError}
+              >
+                ✗ {testError.slice(0, 60)}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Color */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

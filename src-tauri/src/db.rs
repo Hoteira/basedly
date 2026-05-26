@@ -1,11 +1,14 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::postgres::{PgPool, PgRow};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::{Column, Row, TypeInfo};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,12 +57,14 @@ impl Clone for PoolKind {
 
 pub struct DbManager {
     pools: Mutex<HashMap<String, PoolKind>>,
+    watchers: Mutex<HashMap<String, RecommendedWatcher>>,
 }
 
 impl DbManager {
     pub fn new() -> Self {
         DbManager {
             pools: Mutex::new(HashMap::new()),
+            watchers: Mutex::new(HashMap::new()),
         }
     }
 
@@ -82,8 +87,83 @@ impl DbManager {
     }
 
     pub fn disconnect(&self, workspace_id: &str) {
+        // Drop watcher first so the background thread stops before the pool closes
+        if let Ok(mut w) = self.watchers.lock() {
+            w.remove(workspace_id);
+        }
         if let Ok(mut pools) = self.pools.lock() {
             pools.remove(workspace_id);
+        }
+    }
+
+    /// Start watching a SQLite file for external changes.
+    /// Emits the Tauri event "db-file-changed" with the workspace_id payload
+    /// at most once every 400 ms to avoid flooding the UI.
+    pub fn start_sqlite_watch(
+        &self,
+        workspace_id: &str,
+        raw_conn_str: &str,
+        app_handle: tauri::AppHandle,
+    ) {
+        use tauri::Emitter;
+
+        let file_path = match sqlite_file_path(raw_conn_str) {
+            Some(p) => p,
+            None => return,
+        };
+        let parent = match file_path.parent() {
+            Some(p) => p.to_path_buf(),
+            None => return,
+        };
+        let stem = file_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+
+        let ws_id = workspace_id.to_string();
+        let last_ms = Arc::new(AtomicU64::new(0));
+
+        let mut watcher = match notify::recommended_watcher(
+            move |res: notify::Result<notify::Event>| {
+                let Ok(event) = res else { return };
+                let relevant = matches!(
+                    event.kind,
+                    EventKind::Modify(_) | EventKind::Create(_)
+                ) && event.paths.iter().any(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| n.starts_with(stem.as_str()))
+                        .unwrap_or(false)
+                });
+                if !relevant {
+                    return;
+                }
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+                let last = last_ms.load(Ordering::Relaxed);
+                if now.saturating_sub(last) > 400 {
+                    last_ms.store(now, Ordering::Relaxed);
+                    let _ = app_handle.emit("db-file-changed", &ws_id);
+                }
+            },
+        ) {
+            Ok(w) => w,
+            Err(e) => {
+                eprintln!("file watcher init failed: {e}");
+                return;
+            }
+        };
+
+        if let Err(e) = watcher.watch(&parent, RecursiveMode::NonRecursive) {
+            eprintln!("file watcher watch failed: {e}");
+            return;
+        }
+
+        if let Ok(mut w) = self.watchers.lock() {
+            w.insert(workspace_id.to_string(), watcher);
         }
     }
 
@@ -212,6 +292,25 @@ pub fn normalize_sqlite(path: &str) -> String {
     } else {
         format!("sqlite://{}", forward)
     }
+}
+
+fn sqlite_file_path(conn_str: &str) -> Option<PathBuf> {
+    if is_postgres(conn_str) {
+        return None;
+    }
+    let s = if let Some(rest) = conn_str.strip_prefix("sqlite:///") {
+        rest.to_string()
+    } else if let Some(rest) = conn_str.strip_prefix("sqlite://") {
+        rest.to_string()
+    } else if let Some(rest) = conn_str.strip_prefix("sqlite:") {
+        rest.to_string()
+    } else {
+        conn_str.to_string()
+    };
+    if s.is_empty() || s == ":memory:" {
+        return None;
+    }
+    Some(PathBuf::from(s))
 }
 
 pub fn is_safe_identifier(s: &str) -> bool {
