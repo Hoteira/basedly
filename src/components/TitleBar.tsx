@@ -6,14 +6,17 @@ const appWindow = getCurrentWindow();
 
 export default function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
-    appWindow.isMaximized().then(setIsMaximized).catch(() => {});
+    const syncState = () => {
+      appWindow.isMaximized().then(setIsMaximized).catch(() => {});
+      appWindow.isFullscreen().then(setIsFullscreen).catch(() => {});
+    };
+    syncState();
+
     let unlisten: (() => void) | undefined;
-    appWindow
-      .onResized(() => { appWindow.isMaximized().then(setIsMaximized).catch(() => {}); })
-      .then((fn) => { unlisten = fn; })
-      .catch(() => {});
+    appWindow.onResized(syncState).then((fn) => { unlisten = fn; }).catch(() => {});
 
     const onKeyDown = async (e: KeyboardEvent) => {
       if (e.key === "F11") {
@@ -29,6 +32,8 @@ export default function TitleBar() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, []);
+
+  if (isFullscreen) return null;
 
   const btnBase: React.CSSProperties = {
     width: 46,

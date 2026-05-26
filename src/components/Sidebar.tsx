@@ -86,7 +86,7 @@ export default function Sidebar({
         <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--text-1)" }}>
           <BrandIcon size={18} />
           <span style={{ fontWeight: 700, fontSize: 13.5, letterSpacing: "-0.03em" }}>
-            basedly
+            Basedly
           </span>
         </div>
         <button
