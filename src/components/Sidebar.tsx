@@ -1,6 +1,19 @@
 import { useState } from "react";
 import type { TableInfo, WorkspaceConfig } from "../types";
 
+function BrandIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 512 512" fill="none" style={{ display: "block", flexShrink: 0 }}>
+      {/* Bottom face — no fill, just outline */}
+      <path d="M255.904 240 L385.808 315 L255.904 390 L126 315 Z" stroke="currentColor" strokeWidth="21" />
+      {/* Middle face — fill hides bottom-face edges behind it */}
+      <path d="M255.904 179 L385.808 254 L255.904 329 L126 254 Z" className="brand-face-fill" stroke="currentColor" strokeWidth="21" />
+      {/* Top face — fill hides middle-face edges behind it */}
+      <path d="M255.904 122 L385.808 197 L255.904 272 L126 197 Z" className="brand-face-fill" stroke="currentColor" strokeWidth="21" />
+    </svg>
+  );
+}
+
 interface Props {
   workspaces: WorkspaceConfig[];
   activeWsId: string | null;
@@ -9,11 +22,13 @@ interface Props {
   activeTable: string | null;
   schemaLoading: boolean;
   showConsole: boolean;
+  theme: "dark" | "light";
   onSelectWorkspace: (ws: WorkspaceConfig) => void;
   onSelectTable: (name: string) => void;
   onAddWorkspace: () => void;
   onDeleteWorkspace: (id: string) => void;
   onToggleConsole: () => void;
+  onToggleTheme: () => void;
 }
 
 const COLORS = [
@@ -33,11 +48,13 @@ export default function Sidebar({
   activeTable,
   schemaLoading,
   showConsole,
+  theme,
   onSelectWorkspace,
   onSelectTable,
   onAddWorkspace,
   onDeleteWorkspace,
   onToggleConsole,
+  onToggleTheme,
 }: Props) {
   const [hoveredWs, setHoveredWs] = useState<string | null>(null);
 
@@ -56,23 +73,30 @@ export default function Sidebar({
       {/* Header */}
       <div
         style={{
-          padding: "14px 14px 10px",
+          padding: "12px 12px 10px",
           borderBottom: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
         }}
       >
-        <span
+        <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--text-1)" }}>
+          <BrandIcon size={18} />
+          <span style={{ fontWeight: 700, fontSize: 13.5, letterSpacing: "-0.03em" }}>
+            basedly
+          </span>
+        </div>
+        <button
+          onClick={onToggleTheme}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           style={{
-            fontWeight: 700,
-            fontSize: 14,
-            letterSpacing: "-0.03em",
-            color: "var(--text-1)",
+            background: "transparent", border: "none", cursor: "pointer",
+            color: "var(--text-3)", fontSize: 14, padding: "2px 4px",
+            borderRadius: 4, lineHeight: 1,
           }}
         >
-          basedly
-        </span>
+          {theme === "dark" ? "☀" : "☾"}
+        </button>
       </div>
 
       {/* Workspaces */}

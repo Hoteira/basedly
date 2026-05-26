@@ -160,3 +160,37 @@ body,
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 .kanban-card.dragging { opacity: 0.4; }
+
+/* ── Brand icon face fill (uses sidebar bg so faces hide each other) ────────── */
+.brand-face-fill { fill: var(--bg-1); }
+
+/* ── Light theme — Notion white ─────────────────────────────────────────────── */
+
+[data-theme="light"] {
+  --bg-0: #ffffff;
+  --bg-1: #f7f7f5;
+  --bg-2: #efeeec;
+  --bg-3: #e6e5e3;
+  --bg-4: #d8d7d4;
+  --border: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.11);
+  --text-1: #37352f;
+  --text-2: #787774;
+  --text-3: #acaba9;
+  --accent: #2383e2;
+  --accent-hover: #1a75d4;
+  --accent-subtle: rgba(35, 131, 226, 0.08);
+  --green: #0f7b55;
+  --red: #e03e3e;
+  --yellow: #dfab01;
+}
+
+[data-theme="light"] .type-text    { background: rgba(34, 139, 34, 0.08);   color: #2a7446; }
+[data-theme="light"] .type-number  { background: rgba(35, 131, 226, 0.08);  color: #1a6db5; }
+[data-theme="light"] .type-boolean { background: rgba(120, 40, 200, 0.08);  color: #7040b0; }
+[data-theme="light"] .type-date    { background: rgba(200, 100, 0, 0.08);   color: #b85510; }
+[data-theme="light"] .type-json    { background: rgba(150, 120, 0, 0.08);   color: #8a6f00; }
+[data-theme="light"] .type-uuid    { background: rgba(70, 110, 150, 0.08);  color: #406685; }
+[data-theme="light"] .type-default { background: rgba(0, 0, 0, 0.05);       color: var(--text-3); }
+
+[data-theme="light"] .brand-face-fill { fill: var(--bg-1); }

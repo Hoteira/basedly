@@ -1,11 +1,54 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Image as TauriImage } from "@tauri-apps/api/image";
 import { ipc } from "./ipc";
 import type { ColumnInfo, TableInfo, ViewMode, WorkspaceConfig } from "./types";
 import AddWorkspaceModal from "./components/AddWorkspaceModal";
 import Sidebar from "./components/Sidebar";
 import SqlConsole from "./components/SqlConsole";
 import TableView from "./components/TableView";
+
+// Draws the isometric cube (no background) onto a canvas and returns PNG bytes.
+// These are the same parallelogram faces as the SVG, computed analytically.
+function drawCubeIcon(size: number, strokeColor: string, bgColor: string): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const s = size / 512;
+  const face = (tx: number, ty: number, fill: string | null) => {
+    ctx.beginPath();
+    ctx.moveTo(tx * s,               ty * s);
+    ctx.lineTo((tx + 129.904) * s,   (ty + 75) * s);
+    ctx.lineTo(tx * s,               (ty + 150) * s);
+    ctx.lineTo((tx - 129.904) * s,   (ty + 75) * s);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = Math.max(1, 21 * s);
+    ctx.stroke();
+  };
+  face(255.904, 240, null);       // bottom — no fill
+  face(255.904, 179, bgColor);    // middle face hides bottom edges
+  face(255.904, 122, bgColor);    // top face hides middle edges
+  return canvas;
+}
+
+async function applyWindowIcon(isDark: boolean) {
+  try {
+    const stroke = isDark ? "#e8e8e5" : "#37352f";
+    const bg     = isDark ? "#202020" : "#f7f7f5";
+    const canvas = drawCubeIcon(32, stroke, bg);
+    const bytes  = await new Promise<Uint8Array>((res) =>
+      canvas.toBlob((b) => b!.arrayBuffer().then((buf) => res(new Uint8Array(buf))), "image/png")
+    );
+    const img = await TauriImage.fromBytes(bytes);
+    await getCurrentWindow().setIcon(img);
+  } catch (e) {
+    console.warn("window icon update failed:", e);
+  }
+}
 
 export default function App() {
   const [workspaces, setWorkspaces] = useState<WorkspaceConfig[]>([]);
@@ -15,6 +58,10 @@ export default function App() {
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showAddWs, setShowAddWs] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    const saved = localStorage.getItem("theme");
+    return saved === "light" ? "light" : "dark";
+  });
   const [showConsole, setShowConsole] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +70,12 @@ export default function App() {
   useEffect(() => {
     ipc.getWorkspaces().then(setWorkspaces).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+    applyWindowIcon(theme === "dark");
+  }, [theme]);
 
   // Live reload when SQLite file changes on disk
   useEffect(() => {
@@ -106,11 +159,13 @@ export default function App() {
         activeTable={activeTable}
         schemaLoading={schemaLoading}
         showConsole={showConsole}
+        theme={theme}
         onSelectWorkspace={handleSelectWorkspace}
         onSelectTable={setActiveTable}
         onAddWorkspace={() => setShowAddWs(true)}
         onDeleteWorkspace={handleDeleteWorkspace}
         onToggleConsole={() => setShowConsole(v => !v)}
+        onToggleTheme={() => setTheme(t => t === "dark" ? "light" : "dark")}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
