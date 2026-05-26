@@ -66,6 +66,7 @@ export default function DataGrid({
   const [editing, setEditing] = useState<{ rowIdx: number; colName: string } | null>(null);
   const [editVal, setEditVal] = useState("");
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
@@ -234,7 +235,7 @@ export default function DataGrid({
       >
         {/* Sticky header */}
         <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-          <tr style={{ background: "var(--bg-2)" }}>
+          <tr style={{ background: "var(--bg-1)" }}>
             {/* Row actions col */}
             <th style={{ width: 48, minWidth: 48 }} />
             {columns.map((col, i) => (
@@ -247,7 +248,7 @@ export default function DataGrid({
                   fontWeight: 500,
                   fontSize: 11,
                   color: "var(--text-2)",
-                  borderBottom: "1px solid var(--border)",
+                  borderBottom: "1px solid var(--border-strong)",
                   borderRight: "1px solid var(--border)",
                   cursor: "pointer",
                   userSelect: "none",
@@ -305,13 +306,15 @@ export default function DataGrid({
                 key={vRow.key}
                 data-index={vRow.index}
                 onClick={() => setSelectedRow(vRow.index)}
+                onMouseEnter={() => setHoveredRow(vRow.index)}
+                onMouseLeave={() => setHoveredRow(null)}
                 style={{
                   height: ROW_H,
                   background: isSelected
-                    ? "rgba(129,140,248,0.08)"
-                    : vRow.index % 2 === 0
-                    ? "transparent"
-                    : "rgba(255,255,255,0.015)",
+                    ? "var(--accent-subtle)"
+                    : hoveredRow === vRow.index
+                    ? "rgba(255,255,255,0.025)"
+                    : "transparent",
                   borderBottom: "1px solid var(--border)",
                   cursor: "default",
                 }}
