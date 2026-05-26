@@ -84,6 +84,19 @@ export const ipc = {
 
   pickSqliteFile: () =>
     invoke<string | null>("pick_sqlite_file"),
+
+  fetchRowByColumn: (
+    workspaceId: string,
+    tableName: string,
+    columnName: string,
+    columnValue: string
+  ) =>
+    invoke<Record<string, unknown> | null>("fetch_row_by_column", {
+      workspaceId,
+      tableName,
+      columnName,
+      columnValue,
+    }),
 };
 
 export function getPrimaryKey(columns: ColumnInfo[]): ColumnInfo | undefined {

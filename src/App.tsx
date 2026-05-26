@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ipc } from "./ipc";
 import type { ColumnInfo, TableInfo, ViewMode, WorkspaceConfig } from "./types";
 import AddWorkspaceModal from "./components/AddWorkspaceModal";
 import Sidebar from "./components/Sidebar";
+import SqlConsole from "./components/SqlConsole";
 import TableView from "./components/TableView";
 
 export default function App() {
@@ -13,10 +14,10 @@ export default function App() {
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showAddWs, setShowAddWs] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
 
-  // Load workspaces on mount
   useEffect(() => {
     ipc.getWorkspaces().then(setWorkspaces).catch(console.error);
   }, []);
@@ -28,7 +29,6 @@ export default function App() {
       setSchema([]);
       setError(null);
 
-      // Connect if not already
       const alreadyConnected = connected[ws.id];
       if (!alreadyConnected) {
         try {
@@ -40,7 +40,6 @@ export default function App() {
         }
       }
 
-      // Load schema
       setSchemaLoading(true);
       try {
         const tables = await ipc.getSchema(ws.id);
@@ -68,6 +67,7 @@ export default function App() {
         setActiveWsId(null);
         setSchema([]);
         setActiveTable(null);
+        setShowConsole(false);
       }
       setConnected((prev) => {
         const next = { ...prev };
@@ -90,10 +90,12 @@ export default function App() {
         schema={schema}
         activeTable={activeTable}
         schemaLoading={schemaLoading}
+        showConsole={showConsole}
         onSelectWorkspace={handleSelectWorkspace}
         onSelectTable={setActiveTable}
         onAddWorkspace={() => setShowAddWs(true)}
         onDeleteWorkspace={handleDeleteWorkspace}
+        onToggleConsole={() => setShowConsole(v => !v)}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -123,6 +125,7 @@ export default function App() {
             workspaceId={activeWsId}
             tableName={activeTable}
             columns={activeColumns}
+            schema={schema}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
           />
@@ -130,6 +133,13 @@ export default function App() {
           <EmptyState
             hasWorkspace={!!activeWsId}
             onAddWorkspace={() => setShowAddWs(true)}
+          />
+        )}
+
+        {showConsole && activeWsId && (
+          <SqlConsole
+            workspaceId={activeWsId}
+            onClose={() => setShowConsole(false)}
           />
         )}
       </main>

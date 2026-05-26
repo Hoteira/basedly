@@ -164,6 +164,30 @@ impl DbManager {
             PoolKind::Sqlite(p) => exec_sqlite(&p, sql).await,
         }
     }
+
+    pub async fn fetch_row_by_column(
+        &self,
+        workspace_id: &str,
+        table: &str,
+        column: &str,
+        value: &str,
+    ) -> Result<Option<HashMap<String, Value>>, String> {
+        if !is_safe_identifier(table) || !is_safe_identifier(column) {
+            return Err("Invalid identifier".into());
+        }
+        match self.get_kind(workspace_id)? {
+            PoolKind::Postgres(p) => {
+                let sql = format!(r#"SELECT * FROM "{}" WHERE "{}" = $1 LIMIT 1"#, table, column);
+                let rows = sqlx::query(&sql).bind(value).fetch_all(&p).await.map_err(|e| e.to_string())?;
+                Ok(rows.first().map(pg_row_to_map))
+            }
+            PoolKind::Sqlite(p) => {
+                let sql = format!(r#"SELECT * FROM "{}" WHERE "{}" = ? LIMIT 1"#, table, column);
+                let rows = sqlx::query(&sql).bind(value).fetch_all(&p).await.map_err(|e| e.to_string())?;
+                Ok(rows.first().map(sqlite_row_to_map))
+            }
+        }
+    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

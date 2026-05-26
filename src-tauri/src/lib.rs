@@ -165,6 +165,19 @@ async fn test_connection(connection_string: String) -> Result<(), String> {
     db::test_connection(&connection_string).await
 }
 
+#[tauri::command]
+async fn fetch_row_by_column(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    table_name: String,
+    column_name: String,
+    column_value: String,
+) -> Result<Option<HashMap<String, Value>>, String> {
+    state.db_manager
+        .fetch_row_by_column(&workspace_id, &table_name, &column_name, &column_value)
+        .await
+}
+
 // ── File picker for SQLite ─────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -205,6 +218,7 @@ pub fn run() {
             execute_query,
             test_connection,
             pick_sqlite_file,
+            fetch_row_by_column,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Basedly");

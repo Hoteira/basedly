@@ -8,10 +8,12 @@ interface Props {
   schema: TableInfo[];
   activeTable: string | null;
   schemaLoading: boolean;
+  showConsole: boolean;
   onSelectWorkspace: (ws: WorkspaceConfig) => void;
   onSelectTable: (name: string) => void;
   onAddWorkspace: () => void;
   onDeleteWorkspace: (id: string) => void;
+  onToggleConsole: () => void;
 }
 
 const COLORS = [
@@ -30,10 +32,12 @@ export default function Sidebar({
   schema,
   activeTable,
   schemaLoading,
+  showConsole,
   onSelectWorkspace,
   onSelectTable,
   onAddWorkspace,
   onDeleteWorkspace,
+  onToggleConsole,
 }: Props) {
   const [hoveredWs, setHoveredWs] = useState<string | null>(null);
 
@@ -271,6 +275,32 @@ export default function Sidebar({
               </button>
             ))
           )}
+        </div>
+      )}
+
+      {/* SQL Console toggle */}
+      {activeWsId && (
+        <div style={{ borderTop: "1px solid var(--border)", padding: "6px 8px", flexShrink: 0 }}>
+          <button
+            onClick={onToggleConsole}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 8px",
+              borderRadius: 6,
+              background: showConsole ? "var(--bg-3)" : "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: showConsole ? "var(--text-1)" : "var(--text-3)",
+              fontSize: 12,
+              fontFamily: "JetBrains Mono, monospace",
+            }}
+          >
+            <span style={{ fontSize: 11 }}>&gt;_</span>
+            <span>SQL Console</span>
+          </button>
         </div>
       )}
     </aside>
