@@ -1,0 +1,203 @@
+mod config;
+mod db;
+
+use db::{TableInfo, TablePage};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tauri::State;
+
+pub struct AppState {
+    pub db_manager: Arc<db::DbManager>,
+    pub app_config: Mutex<config::AppConfig>,
+}
+
+// ── Workspace management ───────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_workspaces(state: State<'_, AppState>) -> Result<Vec<config::WorkspaceConfig>, String> {
+    Ok(state.app_config.lock().map_err(|e| e.to_string())?.workspaces.clone())
+}
+
+#[tauri::command]
+async fn add_workspace(
+    state: State<'_, AppState>,
+    name: String,
+    connection_string: String,
+    color: Option<String>,
+) -> Result<config::WorkspaceConfig, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let hint = config::mask_connection_string(&connection_string);
+
+    config::store_credentials(&id, &connection_string)?;
+
+    let workspace = config::WorkspaceConfig {
+        id: id.clone(),
+        name,
+        color,
+        connection_hint: hint,
+    };
+
+    let mut cfg = state.app_config.lock().map_err(|e| e.to_string())?;
+    cfg.workspaces.push(workspace.clone());
+    config::save_config(&cfg)?;
+
+    Ok(workspace)
+}
+
+#[tauri::command]
+async fn delete_workspace(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<(), String> {
+    state.db_manager.disconnect(&workspace_id);
+    config::delete_credentials(&workspace_id);
+
+    let mut cfg = state.app_config.lock().map_err(|e| e.to_string())?;
+    cfg.workspaces.retain(|w| w.id != workspace_id);
+    config::save_config(&cfg)
+}
+
+#[tauri::command]
+async fn connect_workspace(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<(), String> {
+    let conn_str = config::get_credentials(&workspace_id)?;
+    state.db_manager.connect(&workspace_id, &conn_str).await
+}
+
+#[tauri::command]
+async fn disconnect_workspace(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<(), String> {
+    state.db_manager.disconnect(&workspace_id);
+    Ok(())
+}
+
+#[tauri::command]
+async fn is_connected(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<bool, String> {
+    Ok(state.db_manager.is_connected(&workspace_id))
+}
+
+// ── Schema & data ──────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_schema(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<Vec<TableInfo>, String> {
+    let pool = state.db_manager.get_pool(&workspace_id)?;
+    db::get_schema(&pool).await
+}
+
+#[tauri::command]
+async fn query_table(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    table_name: String,
+    offset: i64,
+    limit: i64,
+    sort_col: Option<String>,
+    sort_asc: bool,
+) -> Result<TablePage, String> {
+    let pool = state.db_manager.get_pool(&workspace_id)?;
+    db::query_table(
+        &pool,
+        &table_name,
+        offset,
+        limit,
+        sort_col.as_deref(),
+        sort_asc,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn update_row(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    table_name: String,
+    pk_col: String,
+    pk_val: String,
+    update_col: String,
+    update_val: Value,
+    col_type: String,
+) -> Result<(), String> {
+    let pool = state.db_manager.get_pool(&workspace_id)?;
+    db::update_row(
+        &pool,
+        &table_name,
+        &pk_col,
+        &pk_val,
+        &update_col,
+        &update_val,
+        &col_type,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn delete_row(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    table_name: String,
+    pk_col: String,
+    pk_val: String,
+) -> Result<(), String> {
+    let pool = state.db_manager.get_pool(&workspace_id)?;
+    db::delete_row(&pool, &table_name, &pk_col, &pk_val).await
+}
+
+#[tauri::command]
+async fn execute_query(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    sql: String,
+) -> Result<Vec<HashMap<String, Value>>, String> {
+    let pool = state.db_manager.get_pool(&workspace_id)?;
+    db::execute_query(&pool, &sql).await
+}
+
+#[tauri::command]
+async fn test_connection(connection_string: String) -> Result<(), String> {
+    let pool = sqlx::PgPool::connect(&connection_string)
+        .await
+        .map_err(|e| e.to_string())?;
+    pool.close().await;
+    Ok(())
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────────
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let state = AppState {
+        db_manager: Arc::new(db::DbManager::new()),
+        app_config: Mutex::new(config::load_config()),
+    };
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .manage(state)
+        .invoke_handler(tauri::generate_handler![
+            get_workspaces,
+            add_workspace,
+            delete_workspace,
+            connect_workspace,
+            disconnect_workspace,
+            is_connected,
+            get_schema,
+            query_table,
+            update_row,
+            delete_row,
+            execute_query,
+            test_connection,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running Basedly");
+}
