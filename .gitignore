@@ -1,9 +1,14 @@
 node_modules/
 dist/
 dist-sse/
+target/
 src-tauri/target/
+*.lock.bak
 .env
 .env.local
 .DS_Store
 Thumbs.db
 *.swp
+*.pdb
+*.rlib
+*.rmeta
