@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Download } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { save } from "@tauri-apps/plugin-dialog";
 import { ipc, rowPkValue } from "../ipc";
 import type { ColumnInfo } from "../types";
 
@@ -15,6 +16,8 @@ interface Props {
   columns: ColumnInfo[];
   refreshKey: number;
   onRowOpen: (row: Record<string, unknown>) => void;
+  filterCol?: string;
+  filterVal?: string;
 }
 
 function colWidth(col: ColumnInfo): number {
@@ -43,13 +46,20 @@ function formatCell(value: unknown, dt: string): string {
   const t = dt.toLowerCase();
   if (t === "boolean" || t === "bool") return value ? "true" : "false";
   if (t === "jsonb" || t === "json") {
-    try {
-      return JSON.stringify(value).slice(0, 120);
-    } catch {
-      return String(value);
-    }
+    try { return JSON.stringify(value).slice(0, 120); } catch { return String(value); }
   }
   return String(value);
+}
+
+function buildWhere(filterCol: string, filterVal: string): string {
+  const safe = filterVal.replace(/'/g, "''").toLowerCase();
+  return `WHERE LOWER(CAST("${filterCol}" AS TEXT)) LIKE '%${safe}%'`;
+}
+
+function csvEscape(s: string): string {
+  return s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
 }
 
 export default function DataGrid({
@@ -58,6 +68,8 @@ export default function DataGrid({
   columns,
   refreshKey,
   onRowOpen,
+  filterCol,
+  filterVal,
 }: Props) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -68,6 +80,7 @@ export default function DataGrid({
   const [editVal, setEditVal] = useState("");
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
@@ -85,21 +98,25 @@ export default function DataGrid({
       loadingRef.current = true;
       setLoading(true);
       try {
-        const page = await ipc.queryTable(
-          workspaceId,
-          tableName,
-          offset,
-          PAGE_SIZE,
-          sortCol,
-          sortAsc
-        );
-        if (reset) {
-          setRows(page.rows);
+        if (filterVal && filterCol) {
+          const where = buildWhere(filterCol, filterVal);
+          const order = sortCol ? ` ORDER BY "${sortCol}" ${sortAsc ? "ASC" : "DESC"}` : "";
+          const [counts, data] = await Promise.all([
+            ipc.executeQuery(workspaceId, `SELECT COUNT(*) as c FROM "${tableName}" ${where}`),
+            ipc.executeQuery(workspaceId, `SELECT * FROM "${tableName}" ${where}${order} LIMIT ${PAGE_SIZE} OFFSET ${offset}`),
+          ]);
+          const total = Number(counts[0]?.c ?? 0);
+          if (reset) setRows(data);
+          else setRows((p) => [...p, ...data]);
+          setTotalCount(total);
+          offsetRef.current = offset + data.length;
         } else {
-          setRows((prev) => [...prev, ...page.rows]);
+          const page = await ipc.queryTable(workspaceId, tableName, offset, PAGE_SIZE, sortCol, sortAsc);
+          if (reset) setRows(page.rows);
+          else setRows((p) => [...p, ...page.rows]);
+          setTotalCount(page.total_count);
+          offsetRef.current = offset + page.rows.length;
         }
-        setTotalCount(page.total_count);
-        offsetRef.current = offset + page.rows.length;
       } catch (e) {
         console.error(e);
       } finally {
@@ -107,10 +124,10 @@ export default function DataGrid({
         setLoading(false);
       }
     },
-    [workspaceId, tableName, sortCol, sortAsc]
+    [workspaceId, tableName, sortCol, sortAsc, filterCol, filterVal]
   );
 
-  // Reload when table/sort changes or external file change detected
+  // Reload on table/sort/filter change or external file change
   useEffect(() => {
     offsetRef.current = 0;
     setRows([]);
@@ -131,19 +148,17 @@ export default function DataGrid({
     const items = rowVirtualizer.getVirtualItems();
     if (!items.length) return;
     const last = items[items.length - 1];
-    if (
-      last.index >= rows.length - 10 &&
-      rows.length < totalCount &&
-      !loadingRef.current
-    ) {
+    if (last.index >= rows.length - 10 && rows.length < totalCount && !loadingRef.current) {
       loadPage(offsetRef.current, false);
     }
   });
 
-  // Keyboard nav
+  // Keyboard nav — skip when any input/select is focused
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (editing) return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA") return;
       if (e.key === "ArrowDown" && selectedRow !== null) {
         setSelectedRow(Math.min(selectedRow + 1, rows.length - 1));
       } else if (e.key === "ArrowUp" && selectedRow !== null) {
@@ -172,7 +187,7 @@ export default function DataGrid({
         const sum = natural.reduce((a, b) => a + b, 0);
         const available = cw - 48;
         if (available > 0 && sum < available) {
-          setWidths(natural.map(w => Math.floor(w * (available / sum))));
+          setWidths(natural.map((w) => Math.floor(w * (available / sum))));
         }
       }
     });
@@ -188,12 +203,11 @@ export default function DataGrid({
     const available = containerWidth - 48;
     if (containerWidth > 0 && sum < available) {
       const extra = available - sum;
-      return widths.map((w, i) => i === widths.length - 1 ? w + extra : w);
+      return widths.map((w, i) => (i === widths.length - 1 ? w + extra : w));
     }
     return widths;
   }, [widths, containerWidth]);
 
-  // Drag handle between col[i] and col[i+1]: resizes col[i+1], col[i] stays fixed
   const handleResizeMouseDown = (e: React.MouseEvent, targetIdx: number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -203,7 +217,7 @@ export default function DataGrid({
     document.body.style.userSelect = "none";
     const onMove = (ev: MouseEvent) => {
       const newW = Math.max(COL_MIN, startW + (ev.clientX - startX));
-      setWidths(prev => prev.map((w, i) => i === targetIdx ? newW : w));
+      setWidths((prev) => prev.map((w, i) => (i === targetIdx ? newW : w)));
     };
     const onUp = () => {
       document.body.style.cursor = "";
@@ -225,40 +239,20 @@ export default function DataGrid({
     if (!editing) return;
     const row = rows[editing.rowIdx];
     const col = columns.find((c) => c.name === editing.colName);
-    if (!col) {
-      setEditing(null);
-      return;
-    }
+    if (!col) { setEditing(null); return; }
     const pk = rowPkValue(row, columns);
     const pkCol = columns.find((c) => c.is_primary_key);
-    if (!pkCol || !pk) {
-      setEditing(null);
-      return;
-    }
+    if (!pkCol || !pk) { setEditing(null); return; }
     const oldVal = row[editing.colName];
     if (String(oldVal) !== editVal) {
-      // Optimistic update
       setRows((prev) =>
-        prev.map((r, i) =>
-          i === editing.rowIdx ? { ...r, [editing.colName]: editVal } : r
-        )
+        prev.map((r, i) => (i === editing.rowIdx ? { ...r, [editing.colName]: editVal } : r))
       );
       try {
-        await ipc.updateRow(
-          workspaceId,
-          tableName,
-          pkCol.name,
-          pk,
-          editing.colName,
-          editVal,
-          col.data_type
-        );
+        await ipc.updateRow(workspaceId, tableName, pkCol.name, pk, editing.colName, editVal, col.data_type);
       } catch (e) {
-        // Rollback
         setRows((prev) =>
-          prev.map((r, i) =>
-            i === editing.rowIdx ? { ...r, [editing.colName]: oldVal } : r
-          )
+          prev.map((r, i) => (i === editing.rowIdx ? { ...r, [editing.colName]: oldVal } : r))
         );
         console.error(e);
       }
@@ -267,301 +261,277 @@ export default function DataGrid({
   };
 
   const handleSort = (colName: string) => {
-    if (sortCol === colName) {
-      setSortAsc((prev) => !prev);
-    } else {
-      setSortCol(colName);
-      setSortAsc(true);
+    if (sortCol === colName) setSortAsc((prev) => !prev);
+    else { setSortCol(colName); setSortAsc(true); }
+  };
+
+  // ── Export CSV ───────────────────────────────────────────────────────────────
+  const handleExport = async () => {
+    const path = await save({
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+      defaultPath: `${tableName}.csv`,
+    });
+    if (!path) return;
+
+    setExporting(true);
+    try {
+      const where = filterVal && filterCol ? buildWhere(filterCol, filterVal) : "";
+      const order = sortCol ? ` ORDER BY "${sortCol}" ${sortAsc ? "ASC" : "DESC"}` : "";
+      const allRows = await ipc.executeQuery(
+        workspaceId,
+        `SELECT * FROM "${tableName}" ${where}${order} LIMIT 100000`
+      );
+      const header = columns.map((c) => csvEscape(c.name)).join(",");
+      const body = allRows
+        .map((row) =>
+          columns.map((c) => (row[c.name] == null ? "" : csvEscape(String(row[c.name])))).join(",")
+        )
+        .join("\n");
+      const csv = "﻿" + header + "\n" + body;
+      await ipc.saveFile(path, csv);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setExporting(false);
     }
   };
 
-  const totalWidth = Math.max(containerWidth || 0, 48 + (adjustedWidths.length ? adjustedWidths.reduce((a, b) => a + b, 0) : 0));
+  const totalWidth = Math.max(
+    containerWidth || 0,
+    48 + (adjustedWidths.length ? adjustedWidths.reduce((a, b) => a + b, 0) : 0)
+  );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
-    <div
-      ref={scrollRef}
-      style={{
-        overflow: "auto",
-        flex: 1,
-        width: "100%",
-        position: "relative",
-      }}
-    >
-      <table
-        style={{
-          borderCollapse: "collapse",
-          tableLayout: "fixed",
-          width: totalWidth,
-        }}
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, width: "100%" }}>
+      <div
+        ref={scrollRef}
+        style={{ overflow: "auto", flex: 1, width: "100%", position: "relative" }}
       >
-        {/* Sticky header */}
-        <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-          <tr style={{ background: "var(--bg-1)" }}>
-            {/* Row actions col */}
-            <th style={{ width: 48, minWidth: 48 }} />
-            {columns.map((col, i) => (
-              <th
-                key={col.name}
-                style={{
-                  width: adjustedWidths[i] ?? COL_MIN,
-                  padding: "8px 10px",
-                  textAlign: "left",
-                  fontWeight: 500,
-                  fontSize: 11,
-                  color: "var(--text-2)",
-                  borderBottom: "1px solid var(--border-strong)",
-                  borderRight: "1px solid var(--border)",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  position: "relative",
-                }}
-                onClick={() => handleSort(col.name)}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {col.is_primary_key && (
-                    <span
-                      title="Primary key"
-                      style={{
-                        fontSize: 9,
-                        color: "var(--yellow)",
-                        fontWeight: 700,
-                      }}
-                    >
-                      PK
-                    </span>
-                  )}
-                  <span>{col.name}</span>
-                  <span className={typeBadgeClass(col.data_type)}>
-                    {col.data_type.slice(0, 12)}
-                  </span>
-                  {sortCol === col.name && (
-                    <span style={{ fontSize: 9, color: "var(--accent)" }}>
-                      {sortAsc ? "▲" : "▼"}
-                    </span>
-                  )}
-                </span>
-                {i < columns.length - 1 && (
-                  <div
-                    onMouseDown={(e) => handleResizeMouseDown(e, i)}
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--accent)"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                    style={{
-                      position: "absolute", right: 0, top: 0, bottom: 0, width: 5,
-                      cursor: "col-resize", zIndex: 2, background: "transparent",
-                      transition: "background 0.1s",
-                    }}
-                  />
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
-
-        {/* Virtual rows */}
-        <tbody>
-          {/* Spacer before visible rows */}
-          {rowVirtualizer.getVirtualItems().length > 0 && (
-            <tr
-              style={{
-                height:
-                  rowVirtualizer.getVirtualItems()[0].start,
-              }}
-            />
-          )}
-
-          {rowVirtualizer.getVirtualItems().map((vRow) => {
-            const row = rows[vRow.index];
-            const isSelected = selectedRow === vRow.index;
-
-            return (
-              <tr
-                key={vRow.key}
-                data-index={vRow.index}
-                onClick={() => setSelectedRow(vRow.index)}
-                onMouseEnter={() => setHoveredRow(vRow.index)}
-                onMouseLeave={() => setHoveredRow(null)}
-                style={{
-                  height: ROW_H,
-                  background: isSelected
-                    ? "var(--accent-subtle)"
-                    : hoveredRow === vRow.index
-                    ? "var(--bg-2)"
-                    : "transparent",
-                  borderBottom: "1px solid var(--border)",
-                  cursor: "default",
-                }}
-              >
-                {/* Open button */}
-                <td
+        <table style={{ borderCollapse: "collapse", tableLayout: "fixed", width: totalWidth }}>
+          {/* Sticky header */}
+          <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
+            <tr style={{ background: "var(--bg-1)" }}>
+              <th style={{ width: 48, minWidth: 48 }} />
+              {columns.map((col, i) => (
+                <th
+                  key={col.name}
                   style={{
-                    width: 48,
-                    textAlign: "center",
+                    width: adjustedWidths[i] ?? COL_MIN,
+                    padding: "8px 10px", textAlign: "left",
+                    fontWeight: 500, fontSize: 11, color: "var(--text-2)",
+                    borderBottom: "1px solid var(--border-strong)",
                     borderRight: "1px solid var(--border)",
+                    cursor: "pointer", userSelect: "none",
+                    whiteSpace: "nowrap", overflow: "hidden", position: "relative",
+                  }}
+                  onClick={() => handleSort(col.name)}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {col.is_primary_key && (
+                      <span title="Primary key" style={{ fontSize: 9, color: "var(--yellow)", fontWeight: 700 }}>PK</span>
+                    )}
+                    <span>{col.name}</span>
+                    <span className={typeBadgeClass(col.data_type)}>{col.data_type.slice(0, 12)}</span>
+                    {sortCol === col.name && (
+                      <span style={{ fontSize: 9, color: "var(--accent)" }}>{sortAsc ? "▲" : "▼"}</span>
+                    )}
+                  </span>
+                  {i < columns.length - 1 && (
+                    <div
+                      onMouseDown={(e) => handleResizeMouseDown(e, i)}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--accent)"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                      style={{
+                        position: "absolute", right: 0, top: 0, bottom: 0, width: 5,
+                        cursor: "col-resize", zIndex: 2, background: "transparent",
+                        transition: "background 0.1s",
+                      }}
+                    />
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          {/* Virtual rows */}
+          <tbody>
+            {rowVirtualizer.getVirtualItems().length > 0 && (
+              <tr style={{ height: rowVirtualizer.getVirtualItems()[0].start }} />
+            )}
+
+            {rowVirtualizer.getVirtualItems().map((vRow) => {
+              const row = rows[vRow.index];
+              const isSelected = selectedRow === vRow.index;
+
+              return (
+                <tr
+                  key={vRow.key}
+                  data-index={vRow.index}
+                  onClick={() => setSelectedRow(vRow.index)}
+                  onMouseEnter={() => setHoveredRow(vRow.index)}
+                  onMouseLeave={() => setHoveredRow(null)}
+                  style={{
+                    height: ROW_H,
+                    background: isSelected
+                      ? "var(--accent-subtle)"
+                      : hoveredRow === vRow.index
+                      ? "var(--bg-2)"
+                      : "transparent",
+                    borderBottom: "1px solid var(--border)",
+                    cursor: "default",
                   }}
                 >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRowOpen(row);
-                    }}
-                    title="Open row"
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "var(--text-3)",
-                      fontSize: 12,
-                      padding: "2px 6px",
-                      borderRadius: 3,
-                    }}
-                    onMouseOver={(e) =>
-                      ((e.currentTarget as HTMLElement).style.color =
-                        "var(--accent)")
-                    }
-                    onMouseOut={(e) =>
-                      ((e.currentTarget as HTMLElement).style.color =
-                        "var(--text-3)")
-                    }
-                  >
-                    <ArrowUpRight size={13} />
-                  </button>
-                </td>
-
-                {columns.map((col, ci) => {
-                  const isEditing =
-                    editing?.rowIdx === vRow.index &&
-                    editing?.colName === col.name;
-                  const val = row[col.name];
-                  const isPk = col.is_primary_key;
-                  const isBool =
-                    col.data_type === "boolean" ||
-                    col.data_type === "bool";
-
-                  return (
-                    <td
-                      key={col.name}
-                      onDoubleClick={() =>
-                        !isPk && startEdit(vRow.index, col.name, val)
-                      }
+                  {/* Open row button */}
+                  <td style={{ width: 48, textAlign: "center", borderRight: "1px solid var(--border)" }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRowOpen(row); }}
+                      title="Open row"
                       style={{
-                        width: adjustedWidths[ci] ?? COL_MIN,
-                        maxWidth: adjustedWidths[ci] ?? COL_MIN,
-                        padding: "0 10px",
-                        fontSize: 12,
-                        color:
-                          val === null || val === undefined
-                            ? "var(--text-3)"
-                            : "var(--text-1)",
-                        borderRight: "1px solid var(--border)",
-                        overflow: "hidden",
-                        textOverflow: isEditing ? "clip" : "ellipsis",
-                        whiteSpace: "nowrap",
-                        fontFamily:
-                          col.data_type === "uuid" ||
-                          col.data_type === "jsonb" ||
-                          col.data_type === "json"
-                            ? "var(--font-mono, monospace)"
-                            : "inherit",
-                        cursor: isPk ? "default" : "text",
-                        position: "relative",
+                        background: "transparent", border: "none", cursor: "pointer",
+                        color: "var(--text-3)", fontSize: 12, padding: "2px 6px", borderRadius: 3,
                       }}
+                      onMouseOver={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--accent)")}
+                      onMouseOut={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-3)")}
                     >
-                      {isEditing ? (
-                        <input
-                          ref={editInputRef}
-                          value={editVal}
-                          onChange={(e) => setEditVal(e.target.value)}
-                          onBlur={commitEdit}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEdit();
-                            if (e.key === "Escape") setEditing(null);
-                          }}
-                          style={{
-                            width: "100%",
-                            background: "var(--bg-3)",
-                            border: "1px solid var(--accent)",
-                            borderRadius: 3,
-                            color: "var(--text-1)",
-                            fontSize: 12,
-                            padding: "2px 4px",
-                            outline: "none",
-                          }}
-                        />
-                      ) : isBool ? (
-                        <span
-                          style={{
-                            display: "inline-block",
-                            width: 14,
-                            height: 14,
-                            borderRadius: 3,
-                            border: "1px solid var(--bg-4)",
+                      <ArrowUpRight size={13} />
+                    </button>
+                  </td>
+
+                  {columns.map((col, ci) => {
+                    const isEditing = editing?.rowIdx === vRow.index && editing?.colName === col.name;
+                    const val = row[col.name];
+                    const isPk = col.is_primary_key;
+                    const isBool = col.data_type === "boolean" || col.data_type === "bool";
+
+                    return (
+                      <td
+                        key={col.name}
+                        onDoubleClick={() => !isPk && startEdit(vRow.index, col.name, val)}
+                        style={{
+                          width: adjustedWidths[ci] ?? COL_MIN,
+                          maxWidth: adjustedWidths[ci] ?? COL_MIN,
+                          padding: "0 10px", fontSize: 12,
+                          color: val === null || val === undefined ? "var(--text-3)" : "var(--text-1)",
+                          borderRight: "1px solid var(--border)",
+                          overflow: "hidden",
+                          textOverflow: isEditing ? "clip" : "ellipsis",
+                          whiteSpace: "nowrap",
+                          fontFamily:
+                            col.data_type === "uuid" || col.data_type === "jsonb" || col.data_type === "json"
+                              ? "var(--font-mono, monospace)"
+                              : "inherit",
+                          cursor: isPk ? "default" : "text",
+                          position: "relative",
+                        }}
+                      >
+                        {isEditing ? (
+                          <input
+                            ref={editInputRef}
+                            value={editVal}
+                            onChange={(e) => setEditVal(e.target.value)}
+                            onBlur={commitEdit}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitEdit();
+                              if (e.key === "Escape") setEditing(null);
+                            }}
+                            style={{
+                              width: "100%", background: "var(--bg-3)",
+                              border: "1px solid var(--accent)", borderRadius: 3,
+                              color: "var(--text-1)", fontSize: 12,
+                              padding: "2px 4px", outline: "none",
+                            }}
+                          />
+                        ) : isBool ? (
+                          <span style={{
+                            display: "inline-block", width: 14, height: 14,
+                            borderRadius: 3, border: "1px solid var(--bg-4)",
                             background: val ? "var(--accent)" : "transparent",
                             verticalAlign: "middle",
-                          }}
-                        />
-                      ) : val === null || val === undefined ? (
-                        <span style={{ fontStyle: "italic", opacity: 0.4 }}>
-                          null
-                        </span>
-                      ) : (
-                        formatCell(val, col.data_type)
-                      )}
-                      {ci < columns.length - 1 && (
-                        <div
-                          onMouseDown={(e) => handleResizeMouseDown(e, ci)}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--accent)"; (e.currentTarget as HTMLElement).style.opacity = "0.5"; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-                          style={{
-                            position: "absolute", right: 0, top: 0, bottom: 0, width: 5,
-                            cursor: "col-resize", zIndex: 2, background: "transparent",
-                            transition: "background 0.1s",
-                          }}
-                        />
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
+                          }} />
+                        ) : val === null || val === undefined ? (
+                          <span style={{ fontStyle: "italic", opacity: 0.4 }}>null</span>
+                        ) : (
+                          formatCell(val, col.data_type)
+                        )}
+                        {ci < columns.length - 1 && (
+                          <div
+                            onMouseDown={(e) => handleResizeMouseDown(e, ci)}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLElement).style.background = "var(--accent)";
+                              (e.currentTarget as HTMLElement).style.opacity = "0.5";
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLElement).style.background = "transparent";
+                              (e.currentTarget as HTMLElement).style.opacity = "1";
+                            }}
+                            style={{
+                              position: "absolute", right: 0, top: 0, bottom: 0, width: 5,
+                              cursor: "col-resize", zIndex: 2, background: "transparent",
+                              transition: "background 0.1s",
+                            }}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
 
-          {/* Spacer after visible rows */}
-          {rowVirtualizer.getVirtualItems().length > 0 && (
-            <tr
-              style={{
+            {rowVirtualizer.getVirtualItems().length > 0 && (
+              <tr style={{
                 height:
                   rowVirtualizer.getTotalSize() -
                   (rowVirtualizer.getVirtualItems().at(-1)?.end ?? 0),
-              }}
-            />
-          )}
-        </tbody>
-      </table>
+              }} />
+            )}
+          </tbody>
+        </table>
+      </div>
 
-    </div>
-
-      {/* Status bar — outside scroll container so it's always visible */}
-      <div
-        style={{
-          flexShrink: 0,
-          background: "var(--bg-1)",
-          borderTop: "1px solid var(--border)",
-          padding: "5px 14px",
-          fontSize: 11,
-          color: "var(--text-3)",
-          display: "flex",
-          gap: 12,
-        }}
-      >
+      {/* Status bar */}
+      <div style={{
+        flexShrink: 0, background: "var(--bg-1)", borderTop: "1px solid var(--border)",
+        padding: "6px 14px", fontSize: 11, color: "var(--text-3)",
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
         <span>
           {rows.length.toLocaleString()} / {totalCount.toLocaleString()} rows
         </span>
+        {filterVal && (
+          <span style={{ color: "var(--accent)" }}>filtered</span>
+        )}
         {loading && <span style={{ color: "var(--accent)" }}>Loading…</span>}
+
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          title="Export to CSV (max 100 000 rows)"
+          style={{
+            marginLeft: "auto",
+            display: "flex", alignItems: "center", gap: 5,
+            background: "transparent", border: "1px solid var(--border)",
+            color: exporting ? "var(--text-3)" : "var(--text-2)",
+            borderRadius: 4, fontSize: 11, padding: "2px 8px",
+            cursor: exporting ? "default" : "pointer",
+            transition: "border-color 0.1s, color 0.1s",
+          }}
+          onMouseEnter={(e) => {
+            if (!exporting) {
+              (e.currentTarget as HTMLElement).style.borderColor = "var(--accent)";
+              (e.currentTarget as HTMLElement).style.color = "var(--accent)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+            (e.currentTarget as HTMLElement).style.color = exporting ? "var(--text-3)" : "var(--text-2)";
+          }}
+        >
+          <Download size={11} />
+          {exporting ? "Exporting…" : "Export CSV"}
+        </button>
       </div>
     </div>
   );

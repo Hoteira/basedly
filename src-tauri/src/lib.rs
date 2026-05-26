@@ -197,6 +197,11 @@ fn pick_sqlite_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
     Ok(result.map(|p| p.to_string()))
 }
 
+#[tauri::command]
+async fn save_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
 // ── Entry point ────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -258,6 +263,7 @@ pub fn run() {
             test_connection,
             pick_sqlite_file,
             fetch_row_by_column,
+            save_file,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Basedly")

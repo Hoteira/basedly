@@ -85,6 +85,9 @@ export const ipc = {
   pickSqliteFile: () =>
     invoke<string | null>("pick_sqlite_file"),
 
+  saveFile: (path: string, content: string) =>
+    invoke<void>("save_file", { path, content }),
+
   fetchRowByColumn: (
     workspaceId: string,
     tableName: string,
