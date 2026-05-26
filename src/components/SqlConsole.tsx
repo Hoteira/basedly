@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Terminal, X } from "lucide-react";
 import { ipc } from "../ipc";
 
@@ -13,6 +13,29 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
+  const [height, setHeight] = useState(300);
+  const heightRef = useRef(300);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = heightRef.current;
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(160, Math.min(800, startH + (startY - ev.clientY)));
+      heightRef.current = next;
+      setHeight(next);
+    };
+    const onUp = () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const run = async () => {
     if (!sql.trim() || running) return;
@@ -35,9 +58,24 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
   const cols = results && results.length > 0 ? Object.keys(results[0]) : [];
 
   return (
-    <div style={{ borderTop: "2px solid var(--border)", background: "var(--bg-1)", display: "flex", flexDirection: "column", height: 300, flexShrink: 0 }}>
+    <div style={{ background: "var(--bg-1)", display: "flex", flexDirection: "column", height, flexShrink: 0, position: "relative" }}>
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        style={{
+          position: "absolute",
+          top: 0, left: 0, right: 0,
+          height: 5,
+          cursor: "ns-resize",
+          zIndex: 10,
+          background: "transparent",
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--accent)"; (e.currentTarget as HTMLElement).style.opacity = "0.4"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+      />
+
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-2)", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderTop: "2px solid var(--border)", borderBottom: "1px solid var(--border)", background: "var(--bg-2)", flexShrink: 0 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", display: "flex", alignItems: "center", gap: 5 }}><Terminal size={12} /> SQL Console</span>
         <button
           onClick={onClose}

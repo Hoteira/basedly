@@ -5,11 +5,12 @@ use db::{TableInfo, TablePage};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{Manager, State};
 
 pub struct AppState {
     pub db_manager: Arc<db::DbManager>,
     pub app_config: Mutex<config::AppConfig>,
+    pub mcp_server: Mutex<Option<std::process::Child>>,
 }
 
 // ── Workspace management ───────────────────────────────────────────────────────
@@ -203,12 +204,45 @@ pub fn run() {
     let state = AppState {
         db_manager: Arc::new(db::DbManager::new()),
         app_config: Mutex::new(config::load_config()),
+        mcp_server: Mutex::new(None),
     };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
+        .setup(|app| {
+            // Locate mcp/dist/index.js
+            // CARGO_MANIFEST_DIR is src-tauri/ at compile time; project root is one level up.
+            let project_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap_or(std::path::Path::new("."));
+            let mcp_script = app
+                .path()
+                .resource_dir()
+                .ok()
+                .map(|d| d.join("mcp").join("dist").join("index.js"))
+                .filter(|p| p.exists())
+                .unwrap_or_else(|| project_root.join("mcp").join("dist").join("index.js"));
+
+            if mcp_script.exists() {
+                match std::process::Command::new("node")
+                    .arg(&mcp_script)
+                    .spawn()
+                {
+                    Ok(child) => {
+                        let s = app.state::<AppState>();
+                        *s.mcp_server.lock().unwrap() = Some(child);
+                        eprintln!("[basedly] MCP server → http://localhost:3456/mcp");
+                    }
+                    Err(e) => eprintln!("[basedly] MCP server failed to start: {e}"),
+                }
+            } else {
+                eprintln!("[basedly] MCP script not found at {}, skipping", mcp_script.display());
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_workspaces,
             add_workspace,
@@ -225,6 +259,16 @@ pub fn run() {
             pick_sqlite_file,
             fetch_row_by_column,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Basedly");
+        .build(tauri::generate_context!())
+        .expect("error while building Basedly")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                let s = app_handle.state::<AppState>();
+                if let Ok(mut guard) = s.mcp_server.lock() {
+                    if let Some(mut child) = guard.take() {
+                        let _ = child.kill();
+                    }
+                };
+            }
+        });
 }
