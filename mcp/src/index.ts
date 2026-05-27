@@ -5,6 +5,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { createServer } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -12,7 +14,7 @@ import * as crypto from "crypto";
 import pg from "pg";
 import Database from "better-sqlite3";
 
-// ── Config directory (mirrors Rust dirs::config_dir()) ─────────────────────────
+// ── Config directory ───────────────────────────────────────────────────────────
 
 function configDir(): string {
   if (process.platform === "win32") {
@@ -24,8 +26,7 @@ function configDir(): string {
   return path.join(process.env["XDG_CONFIG_HOME"] ?? path.join(os.homedir(), ".config"), "basedly");
 }
 
-// ── AES-256-GCM decryption (same scheme as Rust aes-gcm crate) ────────────────
-// Stored format: "enc:v1:" + base64(nonce[12] + ciphertext + tag[16])
+// ── AES-256-GCM decryption ─────────────────────────────────────────────────────
 
 const ENC_PREFIX = "enc:v1:";
 
@@ -36,7 +37,7 @@ function loadKey(): Buffer {
 function decrypt(value: string): string {
   if (!value.startsWith(ENC_PREFIX)) return value;
   const combined = Buffer.from(value.slice(ENC_PREFIX.length), "base64");
-  if (combined.length < 29) return value; // 12 nonce + 1 data + 16 tag minimum
+  if (combined.length < 29) return value;
   const nonce = combined.subarray(0, 12);
   const tag = combined.subarray(combined.length - 16);
   const ciphertext = combined.subarray(12, combined.length - 16);
@@ -149,7 +150,7 @@ function schemaSqlite(db: Database.Database): TableSchema[] {
   });
 }
 
-// ── Execute arbitrary SQL ──────────────────────────────────────────────────────
+// ── SQL execution ──────────────────────────────────────────────────────────────
 
 async function execSql(
   ws: Workspace,
@@ -160,16 +161,100 @@ async function execSql(
     const result = await conn.pool.query(sql);
     return { rows: result.rows, affected: result.rowCount ?? undefined };
   }
-  // SQLite: use all() for read statements, run() for mutations
   const upper = sql.trimStart().toUpperCase();
   const isRead = upper.startsWith("SELECT") || upper.startsWith("WITH")
     || upper.startsWith("PRAGMA") || upper.startsWith("EXPLAIN");
   const stmt = conn.db.prepare(sql);
-  if (isRead) {
-    return { rows: stmt.all() as Record<string, unknown>[] };
-  }
+  if (isRead) return { rows: stmt.all() as Record<string, unknown>[] };
   const info = stmt.run();
   return { rows: [], affected: info.changes };
+}
+
+// ── WebSocket broadcast ────────────────────────────────────────────────────────
+
+const wsClients = new Set<WebSocket>();
+
+export interface McpEvent {
+  type: "select" | "update" | "delete" | "insert" | "ddl" | "other";
+  agent: string;
+  workspaceId: string;
+  tableName?: string;
+  summary: string;
+  undoSql?: string;
+  ts: number;
+}
+
+function broadcast(event: McpEvent) {
+  const msg = JSON.stringify(event);
+  for (const client of wsClients) {
+    if (client.readyState === WebSocket.OPEN) client.send(msg);
+  }
+}
+
+// ── Agent name detection ───────────────────────────────────────────────────────
+
+let currentAgent = "LLM Agent";
+
+function formatAgent(raw: string): string {
+  const l = raw.toLowerCase();
+  if (l.includes("claude")) return "Claude";
+  if (l.includes("gemini")) return "Gemini";
+  if (l.includes("cursor")) return "Cursor";
+  if (l.includes("copilot")) return "Copilot";
+  if (l.includes("gpt") || l.includes("openai")) return "ChatGPT";
+  if (l.includes("windsurf")) return "Windsurf";
+  if (l.includes("continue")) return "Continue";
+  if (l.includes("cody")) return "Cody";
+  return raw.length < 24 ? raw : "LLM Agent";
+}
+
+// ── SQL helpers for undo ───────────────────────────────────────────────────────
+
+function sqlType(sql: string): McpEvent["type"] {
+  const u = sql.trimStart().toUpperCase();
+  if (u.startsWith("SELECT") || u.startsWith("WITH")) return "select";
+  if (u.startsWith("INSERT")) return "insert";
+  if (u.startsWith("UPDATE")) return "update";
+  if (u.startsWith("DELETE")) return "delete";
+  if (u.startsWith("CREATE") || u.startsWith("ALTER") || u.startsWith("DROP") || u.startsWith("TRUNCATE")) return "ddl";
+  return "other";
+}
+
+function sqlTable(sql: string): string | undefined {
+  const patterns: RegExp[] = [
+    /\bFROM\s+"?(\w+)"?/i,
+    /\bINTO\s+"?(\w+)"?/i,
+    /\bUPDATE\s+"?(\w+)"?/i,
+  ];
+  for (const re of patterns) {
+    const m = sql.match(re);
+    if (m) return m[1];
+  }
+}
+
+function sqlVal(v: unknown): string {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+async function fetchRow(ws: Workspace, table: string, pkCol: string, pkVal: string): Promise<Record<string, unknown> | null> {
+  const conn = getConn(ws);
+  if (conn.kind === "pg") {
+    const r = await conn.pool.query(`SELECT * FROM "${table}" WHERE "${pkCol}" = $1`, [pkVal]);
+    return r.rows[0] ?? null;
+  }
+  return conn.db.prepare(`SELECT * FROM "${table}" WHERE "${pkCol}" = ?`).get(pkVal) as Record<string, unknown> | null;
+}
+
+async function fetchCell(ws: Workspace, table: string, col: string, pkCol: string, pkVal: string): Promise<unknown> {
+  const conn = getConn(ws);
+  if (conn.kind === "pg") {
+    const r = await conn.pool.query(`SELECT "${col}" FROM "${table}" WHERE "${pkCol}" = $1`, [pkVal]);
+    return r.rows[0]?.[col] ?? null;
+  }
+  const row = conn.db.prepare(`SELECT "${col}" FROM "${table}" WHERE "${pkCol}" = ?`).get(pkVal) as Record<string, unknown> | null;
+  return row?.[col] ?? null;
 }
 
 // ── MCP Server ─────────────────────────────────────────────────────────────────
@@ -188,12 +273,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "list_workspaces",
-      description: "List all database connections saved in Basedly. Returns workspace IDs (needed for all other tools), display names, database type (postgres/sqlite), and a masked connection hint.",
+      description: "List all database connections saved in Basedly.",
       inputSchema: { type: "object", properties: {}, required: [] },
     },
     {
       name: "get_schema",
-      description: "Get the full schema for a workspace: all tables with their column names, data types, nullability, and primary-key flags, plus row counts.",
+      description: "Get the full schema for a workspace: tables, columns, types, nullability, PKs, and row counts.",
       inputSchema: {
         type: "object",
         properties: {
@@ -210,22 +295,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           workspace_id: { type: "string" },
           table_name: { type: "string" },
-          limit: { type: "number", description: "Max rows to return (default 100, max 1000)" },
-          offset: { type: "number", description: "Row offset for pagination (default 0)" },
-          sort_col: { type: "string", description: "Column name to sort by" },
-          sort_asc: { type: "boolean", description: "Sort ascending when true (default true)" },
+          limit: { type: "number", description: "Max rows (default 100, max 1000)" },
+          offset: { type: "number", description: "Row offset (default 0)" },
+          sort_col: { type: "string" },
+          sort_asc: { type: "boolean" },
         },
         required: ["workspace_id", "table_name"],
       },
     },
     {
       name: "execute_sql",
-      description: "Execute any SQL against a workspace database. Works for SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, etc. Returns rows for SELECT or the number of affected rows for mutations.",
+      description: "Execute any SQL against a workspace database.",
       inputSchema: {
         type: "object",
         properties: {
           workspace_id: { type: "string" },
-          sql: { type: "string", description: "SQL to execute" },
+          sql: { type: "string" },
         },
         required: ["workspace_id", "sql"],
       },
@@ -238,10 +323,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           workspace_id: { type: "string" },
           table_name: { type: "string" },
-          pk_col: { type: "string", description: "Name of the primary key column" },
-          pk_val: { type: "string", description: "Primary key value (as string)" },
-          column: { type: "string", description: "Column to update" },
-          value: { type: "string", description: "New value (as string)" },
+          pk_col: { type: "string" },
+          pk_val: { type: "string" },
+          column: { type: "string" },
+          value: { type: "string" },
         },
         required: ["workspace_id", "table_name", "pk_col", "pk_val", "column", "value"],
       },
@@ -254,8 +339,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           workspace_id: { type: "string" },
           table_name: { type: "string" },
-          pk_col: { type: "string", description: "Name of the primary key column" },
-          pk_val: { type: "string", description: "Primary key value (as string)" },
+          pk_col: { type: "string" },
+          pk_val: { type: "string" },
         },
         required: ["workspace_id", "table_name", "pk_col", "pk_val"],
       },
@@ -277,25 +362,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             "# Basedly",
             "",
             "Basedly is a desktop database GUI (Tauri + React) for PostgreSQL and SQLite.",
-            "It lets users browse tables, edit cells inline, run SQL queries, and view data in grid or Kanban layout.",
             "",
-            "## What this MCP server exposes",
-            "",
-            "- **list_workspaces** — see all saved database connections",
-            "- **get_schema** — inspect tables and columns for a connection",
-            "- **query_table** — paginate/sort rows from any table",
-            "- **execute_sql** — run arbitrary SQL (SELECT, INSERT, UPDATE, DELETE, DDL)",
-            "- **update_row** — update a single cell by primary key",
-            "- **delete_row** — delete a row by primary key",
-            "",
-            "## Typical workflow",
-            "",
-            "1. Call `list_workspaces` to find workspace IDs.",
-            "2. Call `get_schema` with a workspace ID to see available tables and columns.",
-            "3. Use `query_table` or `execute_sql` to read data.",
-            "4. Use `update_row`, `delete_row`, or `execute_sql` to write data.",
-            "",
-            "Connection strings are read directly from the Basedly config file and decrypted automatically.",
+            "## Tools",
+            "- **list_workspaces** — see all saved connections",
+            "- **get_schema** — inspect tables and columns",
+            "- **query_table** — paginate/sort rows",
+            "- **execute_sql** — run arbitrary SQL",
+            "- **update_row** — update a single cell by PK",
+            "- **delete_row** — delete a row by PK",
           ].join("\n"),
         }],
       };
@@ -338,6 +412,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         rows = conn.db.prepare(`SELECT * FROM "${table}"${order} LIMIT ? OFFSET ?`).all(limit, offset) as Record<string, unknown>[];
         total = (conn.db.prepare(`SELECT COUNT(*) as c FROM "${table}"`).get() as { c: number }).c;
       }
+
+      broadcast({
+        type: "select",
+        agent: currentAgent,
+        workspaceId: ws.id,
+        tableName: table,
+        summary: `Queried \`${table}\` · ${rows.length} of ${total} rows`,
+        ts: Date.now(),
+      });
+
       return {
         content: [{
           type: "text",
@@ -349,7 +433,83 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // ── execute_sql ───────────────────────────────────────────────────────────
     if (name === "execute_sql") {
       const ws = findWorkspace(String(a["workspace_id"]));
-      const result = await execSql(ws, String(a["sql"]));
+      const sql = String(a["sql"]);
+      const type = sqlType(sql);
+      const table = sqlTable(sql);
+
+      // Build undo SQL before mutating
+      let undoSql: string | undefined;
+      if (type === "delete" && table) {
+        // Capture rows before deletion so we can restore them
+        const selectSql = sql.replace(/^\s*DELETE\s+FROM\s+/i, `SELECT * FROM `);
+        try {
+          const before = await execSql(ws, selectSql);
+          if (before.rows.length > 0 && before.rows.length <= 500) {
+            const cols = Object.keys(before.rows[0]);
+            const colList = cols.map(c => `"${c}"`).join(", ");
+            const keyword = ws.db_type === "sqlite" ? "INSERT OR REPLACE INTO" : "INSERT INTO";
+            const conflict = ws.db_type !== "sqlite" ? " ON CONFLICT DO NOTHING" : "";
+            undoSql = before.rows
+              .map(row => `${keyword} "${table}" (${colList}) VALUES (${cols.map(c => sqlVal(row[c])).join(", ")})${conflict};`)
+              .join("\n");
+          }
+        } catch { /* if SELECT fails, proceed without undo */ }
+      } else if (type === "ddl") {
+        const dropMatch = sql.match(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?(\w+)"?/i);
+        if (dropMatch) {
+          const tbl = dropMatch[1];
+          try {
+            const conn = getConn(ws);
+            if (conn.kind === "sqlite") {
+              const row = conn.db.prepare(
+                `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`
+              ).get(tbl) as { sql: string } | null;
+              undoSql = row?.sql ?? undefined;
+            } else {
+              // Postgres: reconstruct CREATE TABLE from information_schema
+              const { rows: cols } = await conn.pool.query<{
+                column_name: string; data_type: string; is_nullable: string; column_default: string | null;
+              }>(
+                `SELECT column_name, data_type, is_nullable, column_default
+                 FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name=$1
+                 ORDER BY ordinal_position`,
+                [tbl]
+              );
+              if (cols.length > 0) {
+                const colDefs = cols.map(c => {
+                  let def = `  "${c.column_name}" ${c.data_type}`;
+                  if (c.column_default) def += ` DEFAULT ${c.column_default}`;
+                  if (c.is_nullable === "NO") def += ` NOT NULL`;
+                  return def;
+                }).join(",\n");
+                undoSql = `CREATE TABLE "${tbl}" (\n${colDefs}\n);`;
+              }
+            }
+          } catch { /* if schema fetch fails, proceed without undo */ }
+        }
+      }
+
+      const result = await execSql(ws, sql);
+      const summaries: Record<McpEvent["type"], string> = {
+        select: `Queried \`${table ?? "?"}\` · ${result.rows.length} rows`,
+        insert: `Inserted into \`${table ?? "?"}\``,
+        update: `Updated \`${table ?? "?"}\` · ${result.affected ?? "?"} row(s)`,
+        delete: `Deleted from \`${table ?? "?"}\``,
+        ddl:    `DDL on \`${table ?? "database"}\``,
+        other:  `Executed SQL`,
+      };
+
+      broadcast({
+        type,
+        agent: currentAgent,
+        workspaceId: ws.id,
+        tableName: table,
+        summary: summaries[type],
+        undoSql,
+        ts: Date.now(),
+      });
+
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 
@@ -362,11 +522,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const col = String(a["column"]);
       const val = String(a["value"]);
       const conn = getConn(ws);
+
+      // Fetch old value for undo
+      const oldVal = await fetchCell(ws, table, col, pkCol, pkVal);
+      const undoSql = `UPDATE "${table}" SET "${col}" = ${sqlVal(oldVal)} WHERE "${pkCol}" = ${sqlVal(pkVal)}`;
+
       if (conn.kind === "pg") {
         await conn.pool.query(`UPDATE "${table}" SET "${col}" = $1 WHERE "${pkCol}" = $2`, [val, pkVal]);
       } else {
         conn.db.prepare(`UPDATE "${table}" SET "${col}" = ? WHERE "${pkCol}" = ?`).run(val, pkVal);
       }
+
+      broadcast({
+        type: "update",
+        agent: currentAgent,
+        workspaceId: ws.id,
+        tableName: table,
+        summary: `Updated \`${col}\` in ${table} · row ${pkVal}\n${oldVal ?? "null"} → ${val}`,
+        undoSql,
+        ts: Date.now(),
+      });
+
       return { content: [{ type: "text", text: "Row updated successfully." }] };
     }
 
@@ -377,11 +553,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const pkCol = String(a["pk_col"]);
       const pkVal = String(a["pk_val"]);
       const conn = getConn(ws);
+
+      // Fetch full row before deleting for undo
+      const oldRow = await fetchRow(ws, table, pkCol, pkVal);
+      let undoSql: string | undefined;
+      if (oldRow) {
+        const colNames = Object.keys(oldRow);
+        const cols = colNames.map(c => `"${c}"`).join(", ");
+        const vals = Object.values(oldRow).map(sqlVal).join(", ");
+        if (conn.kind === "sqlite") {
+          undoSql = `INSERT OR REPLACE INTO "${table}" (${cols}) VALUES (${vals})`;
+        } else {
+          const setClauses = colNames
+            .filter(c => c !== pkCol)
+            .map(c => `"${c}" = EXCLUDED."${c}"`)
+            .join(", ");
+          undoSql = `INSERT INTO "${table}" (${cols}) VALUES (${vals}) ON CONFLICT ("${pkCol}") DO UPDATE SET ${setClauses}`;
+        }
+      }
+
       if (conn.kind === "pg") {
         await conn.pool.query(`DELETE FROM "${table}" WHERE "${pkCol}" = $1`, [pkVal]);
       } else {
         conn.db.prepare(`DELETE FROM "${table}" WHERE "${pkCol}" = ?`).run(pkVal);
       }
+
+      broadcast({
+        type: "delete",
+        agent: currentAgent,
+        workspaceId: ws.id,
+        tableName: table,
+        summary: `Deleted row ${pkVal} from \`${table}\``,
+        undoSql,
+        ts: Date.now(),
+      });
+
       return { content: [{ type: "text", text: "Row deleted successfully." }] };
     }
 
@@ -395,18 +601,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+// ── HTTP + WebSocket server ────────────────────────────────────────────────────
+
 const transport = new StreamableHTTPServerTransport({
   sessionIdGenerator: () => crypto.randomUUID(),
 });
 
 const app = createMcpExpressApp();
+
+// Intercept initialize requests to capture the agent/client name
+app.use("/mcp", (req, _res, next) => {
+  const body = req.body as Record<string, unknown> | undefined;
+  if (body?.method === "initialize") {
+    const info = (body?.params as Record<string, unknown>)?.clientInfo as Record<string, string> | undefined;
+    if (info?.name) currentAgent = formatAgent(info.name);
+  }
+  next();
+});
+
 app.all("/mcp", async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
 await server.connect(transport);
 
+const httpServer = createServer(app);
+
+const wss = new WebSocketServer({ server: httpServer });
+wss.on("connection", (ws) => {
+  wsClients.add(ws);
+  ws.on("close", () => wsClients.delete(ws));
+  ws.on("error", () => wsClients.delete(ws));
+});
+
 const PORT = parseInt(process.env["PORT"] ?? "8453", 10);
-app.listen(PORT, "127.0.0.1", () => {
+httpServer.listen(PORT, "127.0.0.1", () => {
   console.error(`Basedly MCP running at http://localhost:${PORT}/mcp`);
 });

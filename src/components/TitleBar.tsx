@@ -4,7 +4,11 @@ import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 
 const appWindow = getCurrentWindow();
 
-export default function TitleBar() {
+interface Props {
+  mcpConnected?: boolean;
+}
+
+export default function TitleBar({ mcpConnected = false }: Props) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -65,10 +69,21 @@ export default function TitleBar() {
     >
       {/* Drag region fills all available space to the left of buttons */}
       <div
-        style={{ flex: 1, height: "100%", cursor: "default" }}
+        style={{ flex: 1, height: "100%", cursor: "default", display: "flex", alignItems: "center", paddingLeft: 12 }}
         onMouseDown={(e) => { if (e.button === 0) appWindow.startDragging().catch(() => {}); }}
         onDoubleClick={() => isMaximized ? appWindow.unmaximize() : appWindow.maximize()}
-      />
+      >
+        {/* MCP connection dot */}
+        <div
+          title={mcpConnected ? "MCP sidecar connected" : "MCP sidecar offline"}
+          style={{
+            width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+            background: mcpConnected ? "#4caf78" : "var(--bg-4)",
+            boxShadow: mcpConnected ? "0 0 0 2px rgba(76,175,120,0.25)" : "none",
+            transition: "background 0.3s, box-shadow 0.3s",
+          }}
+        />
+      </div>
 
       {/* Minimize */}
       <button

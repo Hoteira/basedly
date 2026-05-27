@@ -206,3 +206,19 @@ body,
 [data-theme="light"] .brand-face-fill { fill: var(--bg-1); }
 
 [data-theme="light"] thead tr { background: var(--bg-2) !important; }
+
+/* ── MCP toast notifications ──────────────────────────────────────────────── */
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastProgress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+.mcp-toast {
+  animation: toastSlideIn 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
