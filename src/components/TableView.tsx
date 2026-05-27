@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Columns3, LayoutGrid, Search, X } from "lucide-react";
 import type { ColumnInfo, TableInfo, ViewMode } from "../types";
 import DataGrid from "./DataGrid";
@@ -27,7 +27,6 @@ export default function TableView({
   const [peekRow, setPeekRow] = useState<Record<string, unknown> | null>(null);
   const [kanbanColName, setKanbanColName] = useState("");
 
-  // ── Filter state ────────────────────────────────────────────────────────────
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterCol, setFilterCol] = useState(columns[0]?.name ?? "");
   const [filterInput, setFilterInput] = useState("");
@@ -54,7 +53,7 @@ export default function TableView({
     if (filterOpen) setTimeout(() => filterInputRef.current?.focus(), 40);
   }, [filterOpen]);
 
-  // Ctrl+F — toggle the filter bar
+  // Ctrl+F - toggle the filter bar
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.key === "f" || e.key === "F") && (e.ctrlKey || e.metaKey)) {
@@ -75,11 +74,9 @@ export default function TableView({
     setFilterVal("");
   };
 
-  // ── Kanban helpers ──────────────────────────────────────────────────────────
   const nonPkCols = columns.filter((c) => !c.is_primary_key);
   const groupCol = nonPkCols.find((c) => c.name === kanbanColName) ?? nonPkCols[0];
 
-  // ── Styles ──────────────────────────────────────────────────────────────────
   const btnStyle = (active: boolean): React.CSSProperties => ({
     display: "flex", alignItems: "center", gap: 5,
     padding: "3px 10px", borderRadius: 4, border: "none", cursor: "pointer",
@@ -101,7 +98,6 @@ export default function TableView({
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <div style={{
         height: 40, flexShrink: 0,
         display: "flex", alignItems: "center", gap: 10, padding: "0 16px",
@@ -110,7 +106,6 @@ export default function TableView({
         <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text-1)" }}>{tableName}</span>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
-          {/* Filter toggle */}
           <button
             onClick={() => filterOpen ? closeFilter() : setFilterOpen(true)}
             title="Filter (Ctrl+F)"
@@ -127,7 +122,6 @@ export default function TableView({
             )}
           </button>
 
-          {/* View mode toggle */}
           <div style={{ display: "flex", background: "var(--bg-3)", borderRadius: 6, padding: 2 }}>
             <button onClick={() => onViewModeChange("grid")} style={btnStyle(viewMode === "grid")}>
               <LayoutGrid size={11} /> Grid
@@ -139,7 +133,6 @@ export default function TableView({
         </div>
       </div>
 
-      {/* ── Filter bar ──────────────────────────────────────────────────────── */}
       {filterOpen && (
         <div style={{
           flexShrink: 0, height: 38,
@@ -153,7 +146,7 @@ export default function TableView({
             onChange={(e) => setFilterCol(e.target.value)}
             style={{
               background: "var(--bg-3)", border: "1px solid var(--border)",
-              color: "var(--text-1)", borderRadius: 4, fontSize: 11,
+              color: "var(--text-1)", borderRadius: 6, fontSize: 11,
               padding: "2px 6px", cursor: "pointer", flexShrink: 0, maxWidth: 150,
               outline: "none",
             }}
@@ -179,7 +172,6 @@ export default function TableView({
             onBlur={(e) => { e.currentTarget.style.borderColor = "var(--border-strong)"; }}
           />
 
-          {/* Clear input */}
           {filterInput && (
             <button
               onClick={() => { setFilterInput(""); setFilterVal(""); filterInputRef.current?.focus(); }}
@@ -196,7 +188,6 @@ export default function TableView({
             </button>
           )}
 
-          {/* Close bar */}
           <button
             onClick={closeFilter}
             title="Close filter (Esc)"
@@ -213,7 +204,6 @@ export default function TableView({
         </div>
       )}
 
-      {/* ── Content ─────────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
         {viewMode === "grid" || !groupCol ? (
           <DataGrid

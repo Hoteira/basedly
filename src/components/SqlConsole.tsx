@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+﻿import { useState, useRef } from "react";
 import { Terminal, X } from "lucide-react";
 import { ipc } from "../ipc";
 
@@ -59,7 +59,6 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
 
   return (
     <div style={{ background: "var(--bg-1)", display: "flex", flexDirection: "column", height, flexShrink: 0, position: "relative" }}>
-      {/* Resize handle */}
       <div
         onMouseDown={handleResizeMouseDown}
         style={{
@@ -74,7 +73,6 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.opacity = "1"; }}
       />
 
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderTop: "2px solid var(--border)", borderBottom: "1px solid var(--border)", background: "var(--bg-2)", flexShrink: 0 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", display: "flex", alignItems: "center", gap: 5 }}><Terminal size={12} /> SQL Console</span>
         <button
@@ -85,7 +83,6 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
         </button>
       </div>
 
-      {/* Editor */}
       <div style={{ display: "flex", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
         <textarea
           value={sql}
@@ -97,7 +94,7 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
             }
           }}
           style={{
-            flex: 1, fontFamily: "JetBrains Mono, monospace", fontSize: 12,
+            flex: 1, fontFamily: "JetBrains Mono, monospace", fontSize: 13,
             resize: "none", height: 68, background: "var(--bg-2)",
             border: "1px solid var(--border)", borderRadius: 6,
             padding: "8px 10px", color: "var(--text-1)", outline: "none",
@@ -115,7 +112,6 @@ export default function SqlConsole({ workspaceId, onClose }: Props) {
         </button>
       </div>
 
-      {/* Results */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {error && (
           <div style={{ padding: "8px 12px", color: "var(--red)", fontSize: 12, fontFamily: "JetBrains Mono, monospace", whiteSpace: "pre-wrap" }}>

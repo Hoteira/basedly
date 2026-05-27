@@ -1,11 +1,10 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+﻿@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Notion-dark palette — warm grays, not pure black */
   --bg-0: #191919;
   --bg-1: #202020;
   --bg-2: #272727;
@@ -22,6 +21,9 @@
   --green: #4caf78;
   --red: #df5c5c;
   --yellow: #c89b12;
+  --error-bg: rgba(223, 92, 92, 0.08);
+  --error-border: rgba(223, 92, 92, 0.20);
+  --toast-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
 }
 
@@ -49,7 +51,6 @@ body,
 ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #505050; }
 
-/* ── Buttons ──────────────────────────────────────────────────────────────── */
 
 .btn {
   display: inline-flex;
@@ -91,7 +92,6 @@ body,
   background: rgba(223, 92, 92, 0.08);
 }
 
-/* ── Inputs ───────────────────────────────────────────────────────────────── */
 
 .input {
   background: var(--bg-3);
@@ -108,7 +108,6 @@ body,
 .input:focus { border-color: var(--accent); }
 .input::placeholder { color: var(--text-3); }
 
-/* ── Type badges — muted, Notion-style ────────────────────────────────────── */
 
 .type-badge {
   font-family: var(--font-mono);
@@ -126,7 +125,6 @@ body,
 .type-uuid    { background: rgba(139, 170, 184, 0.09); color: #8baab8; }
 .type-default { background: rgba(255, 255, 255, 0.04); color: var(--text-3); }
 
-/* ── Peek panel ───────────────────────────────────────────────────────────── */
 
 .peek-panel {
   position: fixed;
@@ -144,7 +142,6 @@ body,
 }
 .peek-panel.open { transform: translateX(0); }
 
-/* ── Kanban ───────────────────────────────────────────────────────────────── */
 
 .kanban-card {
   background: var(--bg-2);
@@ -161,10 +158,8 @@ body,
 }
 .kanban-card.dragging { opacity: 0.4; }
 
-/* ── Brand icon face fill (uses sidebar bg so faces hide each other) ────────── */
 .brand-face-fill { fill: var(--bg-1); }
 
-/* ── Empty state watermark ────────────────────────────────────────────────────── */
 .empty-brand {
   font-size: 48px;
   font-weight: 700;
@@ -174,7 +169,6 @@ body,
 }
 [data-theme="light"] .empty-brand { opacity: 0.30; }
 
-/* ── Light theme — Notion white ─────────────────────────────────────────────── */
 
 [data-theme="light"] {
   --bg-0: #ffffff;
@@ -193,6 +187,9 @@ body,
   --green: #0f7b55;
   --red: #e03e3e;
   --yellow: #dfab01;
+  --error-bg: rgba(224, 62, 62, 0.07);
+  --error-border: rgba(224, 62, 62, 0.18);
+  --toast-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 [data-theme="light"] .type-text    { background: rgba(34, 139, 34, 0.08);   color: #2a7446; }
@@ -207,7 +204,6 @@ body,
 
 [data-theme="light"] thead tr { background: var(--bg-2) !important; }
 
-/* ── MCP toast notifications ──────────────────────────────────────────────── */
 
 @keyframes toastSlideIn {
   from { opacity: 0; transform: translateX(24px); }

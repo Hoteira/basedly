@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -32,7 +32,7 @@ function drawCubeIcon(size: number, strokeColor: string, bgColor: string): HTMLC
     ctx.lineWidth = Math.max(1, 21 * s);
     ctx.stroke();
   };
-  face(255.904, 240, null);       // bottom — no fill
+  face(255.904, 240, null);       // bottom - no fill
   face(255.904, 179, bgColor);    // middle face hides bottom edges
   face(255.904, 122, bgColor);    // top face hides middle edges
   return canvas;
@@ -80,7 +80,7 @@ export default function App() {
     ipc.getWorkspaces().then(setWorkspaces).catch(console.error);
   }, []);
 
-  // Show window only after first render — avoids white/black flash on startup
+  // Show window only after first render - avoids white/black flash on startup
   useEffect(() => {
     getCurrentWindow().show().catch(() => {});
   }, []);
@@ -113,7 +113,7 @@ export default function App() {
             type: "other",
             agent: "Basedly",
             workspaceId: "",
-            summary: "MCP sidecar is live — AI agents can now query your databases",
+            summary: "MCP sidecar is live - AI agents can now query your databases",
             ts: Date.now(),
           };
           setMcpToasts((prev) => [...prev, welcome]);
@@ -236,7 +236,7 @@ export default function App() {
     setMcpToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Ctrl+Shift+T — fire a test toast to verify the notification system
+  // Ctrl+Shift+T - fire a test toast to verify the notification system
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "T" && e.ctrlKey && e.shiftKey) {
@@ -301,8 +301,8 @@ export default function App() {
           <div
             className="flex items-center gap-2 px-4 py-2 text-xs"
             style={{
-              background: "rgba(248,113,113,0.08)",
-              borderBottom: "1px solid rgba(248,113,113,0.2)",
+              background: "var(--error-bg)",
+              borderBottom: "1px solid var(--error-border)",
               color: "var(--red)",
             }}
           >
@@ -352,7 +352,6 @@ export default function App() {
         />
       )}
 
-      {/* MCP toast container — bottom-right */}
       {mcpToasts.length > 0 && (
         <div style={{
           position: "fixed", bottom: 20, right: 20,

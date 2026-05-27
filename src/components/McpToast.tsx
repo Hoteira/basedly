@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+﻿import { useEffect, useRef } from "react";
 import { X, Undo2 } from "lucide-react";
 
 export interface McpEvent {
@@ -62,12 +62,10 @@ export default function McpToastItem({ toast, onDismiss, onUndo }: Props) {
         borderLeft: `3px solid ${c.bar}`,
         borderRadius: 8,
         overflow: "hidden",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+        boxShadow: "var(--toast-shadow)",
       }}
     >
-      {/* Body */}
       <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 5 }}>
-        {/* Header row */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
@@ -101,7 +99,6 @@ export default function McpToastItem({ toast, onDismiss, onUndo }: Props) {
           </button>
         </div>
 
-        {/* Summary */}
         <p style={{
           fontSize: 11, color: "var(--text-2)", margin: 0,
           lineHeight: 1.4, wordBreak: "break-word",
@@ -109,7 +106,6 @@ export default function McpToastItem({ toast, onDismiss, onUndo }: Props) {
           {toast.summary}
         </p>
 
-        {/* Undo button */}
         {toast.undoSql && (
           <button
             onClick={() => onUndo(toast)}

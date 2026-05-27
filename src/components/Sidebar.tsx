@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Moon, Plus, Sun, Terminal, X } from "lucide-react";
 import { SiPostgresql, SiSqlite } from "react-icons/si";
 import type { TableInfo, WorkspaceConfig } from "../types";
@@ -6,11 +6,11 @@ import type { TableInfo, WorkspaceConfig } from "../types";
 function BrandIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 512 512" fill="none" style={{ display: "block", flexShrink: 0 }}>
-      {/* Bottom face — no fill, just outline */}
+      {/* Bottom face - no fill, just outline */}
       <path d="M255.904 240 L385.808 315 L255.904 390 L126 315 Z" stroke="currentColor" strokeWidth="21" />
-      {/* Middle face — fill hides bottom-face edges behind it */}
+      {/* Middle face - fill hides bottom-face edges behind it */}
       <path d="M255.904 179 L385.808 254 L255.904 329 L126 254 Z" className="brand-face-fill" stroke="currentColor" strokeWidth="21" />
-      {/* Top face — fill hides middle-face edges behind it */}
+      {/* Top face - fill hides middle-face edges behind it */}
       <path d="M255.904 122 L385.808 197 L255.904 272 L126 197 Z" className="brand-face-fill" stroke="currentColor" strokeWidth="21" />
     </svg>
   );
@@ -72,7 +72,6 @@ export default function Sidebar({
         overflow: "hidden",
       }}
     >
-      {/* Header */}
       <div
         style={{
           height: 40,
@@ -105,7 +104,6 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Workspaces */}
       <div style={{ padding: "10px 8px 6px" }}>
         <div
           style={{
@@ -156,7 +154,7 @@ export default function Sidebar({
               <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {ws.name}
               </span>
-              {/* Right slot: X on hover, DB icon otherwise — same space so name never shifts */}
+              {/* Right slot: X on hover, DB icon otherwise - same space so name never shifts */}
               {isHovered ? (
                 <span
                   onClick={(e) => { e.stopPropagation(); onDeleteWorkspace(ws.id); }}
@@ -204,7 +202,6 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Tables */}
       {activeWsId && (
         <div
           style={{
@@ -288,7 +285,6 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* SQL Console toggle */}
       {activeWsId && (
         <div style={{ borderTop: "1px solid var(--border)", padding: "6px 8px", flexShrink: 0 }}>
           <button

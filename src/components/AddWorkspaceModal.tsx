@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { SiPostgresql, SiSqlite } from "react-icons/si";
 import { ipc } from "../ipc";
@@ -93,13 +93,11 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
           display: "flex", flexDirection: "column", gap: 16,
         }}
       >
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ fontSize: 15, fontWeight: 600 }}>Add connection</h2>
           <button className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={onClose}><X size={14} /></button>
         </div>
 
-        {/* DB type tabs */}
         <div
           style={{
             display: "flex", background: "var(--bg-3)",
@@ -127,7 +125,6 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
           ))}
         </div>
 
-        {/* Name */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 12, color: "var(--text-2)" }}>Display name</label>
           <input
@@ -139,7 +136,6 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
           />
         </div>
 
-        {/* Connection input */}
         {mode === "postgres" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 12, color: "var(--text-2)" }}>Connection string</label>
@@ -177,7 +173,7 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
           </div>
         )}
 
-        {/* Test — only for Postgres; SQLite just needs the file path */}
+        {/* Test - only for Postgres; SQLite just needs the file path */}
         {mode === "postgres" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
@@ -202,7 +198,6 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
           </div>
         )}
 
-        {/* Color */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <label style={{ fontSize: 12, color: "var(--text-2)" }}>Color</label>
           <div style={{ display: "flex", gap: 8 }}>
@@ -222,7 +217,6 @@ export default function AddWorkspaceModal({ onAdd, onClose }: Props) {
 
         {error && <p style={{ fontSize: 11, color: "var(--red)" }}>{error}</p>}
 
-        {/* Actions */}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>

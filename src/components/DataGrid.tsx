@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Download, Plus } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -110,7 +110,7 @@ export default function DataGrid({
   const [containerWidth, setContainerWidth] = useState(0);
   const initializedRef = useRef(false);
 
-  // Column resize hover/active tracking — drives column-wide border highlight
+  // Column resize hover/active tracking - drives column-wide border highlight
   const [hoverResizeCol, setHoverResizeCol] = useState<number | null>(null);
   const [resizingCol, setResizingCol] = useState<number | null>(null);
 
@@ -275,7 +275,7 @@ export default function DataGrid({
         const pk = rowPkValue(row, columns);
         await ipc.updateRow(workspaceId, tableName, pkCols[0].name, pk, editing.colName, editVal, col.data_type);
       } else {
-        // Composite PK — build raw SQL
+        // Composite PK - build raw SQL
         const where = pkCols
           .map((pk) => `"${pk.name}" = ${toSqlLiteral(String(row[pk.name] ?? ""), pk.data_type)}`)
           .join(" AND ");
@@ -518,7 +518,6 @@ export default function DataGrid({
           </table>
         </div>
 
-        {/* Floating insert FAB — sits above the status bar */}
         {hasPk && (
           <button
             onClick={() => setShowInsert(true)}
@@ -548,7 +547,6 @@ export default function DataGrid({
           </button>
         )}
 
-        {/* Status bar */}
         <div style={{
           flexShrink: 0, background: "var(--bg-1)", borderTop: "1px solid var(--border)",
           padding: "9px 14px", fontSize: 11, color: "var(--text-3)",
@@ -556,7 +554,7 @@ export default function DataGrid({
         }}>
           <span>{rows.length.toLocaleString()} / {totalCount.toLocaleString()} rows</span>
           {!hasPk && (
-            <span style={{ color: "var(--yellow)", fontSize: 10 }}>no primary key — read-only</span>
+            <span style={{ color: "var(--yellow)", fontSize: 10 }}>no primary key - read-only</span>
           )}
           {pkCols.length > 1 && (
             <span style={{ color: "var(--text-3)", fontSize: 10 }}>composite PK</span>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { ArrowRight, Check, ChevronLeft, Copy, Pencil, X } from "lucide-react";
 import { ipc, rowPkValue } from "../ipc";
 import type { ColumnInfo, ForeignKeyInfo, TableInfo } from "../types";
@@ -127,13 +127,11 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
   return (
     <>
       {isOpen && (
-        <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 40 }} />
+        <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 90 }} />
       )}
 
       <div className={`peek-panel ${isOpen ? "open" : ""}`}>
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-          {/* Breadcrumb */}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 4, overflow: "hidden" }}>
             {breadcrumb.map((name, i) => (
               <span key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -162,7 +160,6 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
           <button className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={onClose}><X size={14} /></button>
         </div>
 
-        {/* Fields */}
         <div style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>
           {row && current.columns.map(col => {
             const val = current.row[col.name];
@@ -174,19 +171,17 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
 
             return (
               <div key={col.name} style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)" }}>
-                {/* Field header */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-2)" }}>{col.name}</span>
                   {isPk && <span style={{ fontSize: 9, color: "var(--yellow)", fontWeight: 700 }}>PK</span>}
 
-                  {/* FK badge — clickable */}
                   {col.foreign_key && (
                     <button
                       onClick={() => navigateToFk(col.foreign_key!, val)}
                       disabled={val == null || fkLoading === fkKey}
                       title={`Open linked ${col.foreign_key.foreign_table} row`}
                       style={{
-                        background: "rgba(129,140,248,0.12)", border: "none", borderRadius: 4,
+                        background: "var(--accent-subtle)", border: "none", borderRadius: 4,
                         color: "var(--accent)", fontSize: 9, fontWeight: 500,
                         padding: "1px 6px", cursor: val == null ? "default" : "pointer",
                         opacity: val == null ? 0.4 : 1,
@@ -215,7 +210,6 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
                   </div>
                 </div>
 
-                {/* Value */}
                 {isEditing
                   ? <input autoFocus className="input" value={editVal} onChange={e => setEditVal(e.target.value)} onBlur={() => commitEdit(col)} onKeyDown={e => { if (e.key === "Enter") commitEdit(col); if (e.key === "Escape") setEditingField(null); }} style={{ fontSize: 12 }} />
                   : renderValue(col, val)

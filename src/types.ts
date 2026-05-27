@@ -1,4 +1,4 @@
-export interface WorkspaceConfig {
+﻿export interface WorkspaceConfig {
   id: string;
   name: string;
   color?: string;

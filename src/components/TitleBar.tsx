@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 
@@ -77,7 +77,6 @@ export default function TitleBar({ mcpConnected = false }: Props) {
         onMouseDown={(e) => { if (e.button === 0) appWindow.startDragging().catch(() => {}); }}
         onDoubleClick={() => isMaximized ? appWindow.unmaximize() : appWindow.maximize()}
       >
-        {/* MCP connection dot */}
         <div
           title={mcpConnected ? "MCP sidecar connected" : "MCP sidecar offline"}
           style={{
@@ -89,7 +88,6 @@ export default function TitleBar({ mcpConnected = false }: Props) {
         />
       </div>
 
-      {/* Minimize */}
       <button
         style={btnBase}
         onClick={() => appWindow.minimize()}
@@ -100,7 +98,6 @@ export default function TitleBar({ mcpConnected = false }: Props) {
         <Minus size={12} />
       </button>
 
-      {/* Maximize / Restore */}
       <button
         style={btnBase}
         onClick={() => isMaximized ? appWindow.unmaximize() : appWindow.maximize()}
@@ -111,12 +108,11 @@ export default function TitleBar({ mcpConnected = false }: Props) {
         {isMaximized ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
       </button>
 
-      {/* Close */}
       <button
         style={btnBase}
         onClick={() => appWindow.close()}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "#c42b1c";
+          (e.currentTarget as HTMLElement).style.background = "var(--red)";
           (e.currentTarget as HTMLElement).style.color = "#fff";
         }}
         onMouseLeave={(e) => {

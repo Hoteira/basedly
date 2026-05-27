@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { X } from "lucide-react";
 import type { ColumnInfo } from "../types";
 import { ipc } from "../ipc";
@@ -82,17 +82,16 @@ export default function InsertRowModal({ workspaceId, tableName, columns, onClos
     >
       <div style={{
         background: "var(--bg-1)", border: "1px solid var(--border-strong)",
-        borderRadius: 10, width: 460, maxWidth: "92vw", maxHeight: "80vh",
+        borderRadius: 12, width: 460, maxWidth: "92vw", maxHeight: "80vh",
         display: "flex", flexDirection: "column",
         boxShadow: "0 24px 64px rgba(0,0,0,0.55)",
       }}>
-        {/* Header */}
         <div style={{
           display: "flex", alignItems: "center", padding: "14px 16px",
           borderBottom: "1px solid var(--border)", flexShrink: 0,
         }}>
           <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text-1)" }}>
-            Insert row — {tableName}
+            Insert row - {tableName}
           </span>
           <button
             onClick={onClose}

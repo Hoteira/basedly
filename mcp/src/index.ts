@@ -1,4 +1,4 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+﻿import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import {
@@ -14,7 +14,7 @@ import * as crypto from "crypto";
 import pg from "pg";
 import Database from "better-sqlite3";
 
-// ── Config directory ───────────────────────────────────────────────────────────
+// Config directory
 
 function configDir(): string {
   if (process.platform === "win32") {
@@ -26,7 +26,7 @@ function configDir(): string {
   return path.join(process.env["XDG_CONFIG_HOME"] ?? path.join(os.homedir(), ".config"), "basedly");
 }
 
-// ── AES-256-GCM decryption ─────────────────────────────────────────────────────
+// AES-256-GCM decryption
 
 const ENC_PREFIX = "enc:v1:";
 
@@ -46,7 +46,7 @@ function decrypt(value: string): string {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
 }
 
-// ── Workspace config ───────────────────────────────────────────────────────────
+// Workspace config
 
 interface Workspace {
   id: string;
@@ -73,7 +73,7 @@ function findWorkspace(id: string): Workspace {
   return ws;
 }
 
-// ── Connection management ──────────────────────────────────────────────────────
+// Connection management
 
 const pgPools = new Map<string, pg.Pool>();
 const sqliteDbs = new Map<string, Database.Database>();
@@ -102,7 +102,7 @@ function getConn(ws: Workspace): Conn {
   return { kind: "pg", pool: pgPools.get(ws.id)! };
 }
 
-// ── Schema helpers ─────────────────────────────────────────────────────────────
+// Schema helpers
 
 interface ColInfo { name: string; type: string; nullable: boolean; pk: boolean }
 interface TableSchema { name: string; columns: ColInfo[]; row_count: number }
@@ -150,7 +150,7 @@ function schemaSqlite(db: Database.Database): TableSchema[] {
   });
 }
 
-// ── SQL execution ──────────────────────────────────────────────────────────────
+// SQL execution
 
 async function execSql(
   ws: Workspace,
@@ -170,7 +170,7 @@ async function execSql(
   return { rows: [], affected: info.changes };
 }
 
-// ── WebSocket broadcast ────────────────────────────────────────────────────────
+// WebSocket broadcast
 
 const wsClients = new Set<WebSocket>();
 
@@ -191,7 +191,7 @@ function broadcast(event: McpEvent) {
   }
 }
 
-// ── Agent name detection ───────────────────────────────────────────────────────
+// Agent name detection
 
 let currentAgent = "LLM Agent";
 
@@ -208,7 +208,7 @@ function formatAgent(raw: string): string {
   return raw.length < 24 ? raw : "LLM Agent";
 }
 
-// ── SQL helpers for undo ───────────────────────────────────────────────────────
+// SQL helpers for undo
 
 function sqlType(sql: string): McpEvent["type"] {
   const u = sql.trimStart().toUpperCase();
@@ -257,7 +257,7 @@ async function fetchCell(ws: Workspace, table: string, col: string, pkCol: strin
   return row?.[col] ?? null;
 }
 
-// ── MCP Server ─────────────────────────────────────────────────────────────────
+// MCP Server
 
 const server = new Server(
   { name: "basedly", version: "1.0.0" },
@@ -353,7 +353,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const a = (args ?? {}) as Record<string, unknown>;
 
   try {
-    // ── describe_app ──────────────────────────────────────────────────────────
+    // describe_app
     if (name === "describe_app") {
       return {
         content: [{
@@ -364,18 +364,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             "Basedly is a desktop database GUI (Tauri + React) for PostgreSQL and SQLite.",
             "",
             "## Tools",
-            "- **list_workspaces** — see all saved connections",
-            "- **get_schema** — inspect tables and columns",
-            "- **query_table** — paginate/sort rows",
-            "- **execute_sql** — run arbitrary SQL",
-            "- **update_row** — update a single cell by PK",
-            "- **delete_row** — delete a row by PK",
+            "- **list_workspaces** - see all saved connections",
+            "- **get_schema** - inspect tables and columns",
+            "- **query_table** - paginate/sort rows",
+            "- **execute_sql** - run arbitrary SQL",
+            "- **update_row** - update a single cell by PK",
+            "- **delete_row** - delete a row by PK",
           ].join("\n"),
         }],
       };
     }
 
-    // ── list_workspaces ───────────────────────────────────────────────────────
+    // list_workspaces
     if (name === "list_workspaces") {
       const list = loadWorkspaces().map(({ id, name, db_type, connection_hint, color }) => ({
         id, name, db_type, connection_hint, color,
@@ -383,7 +383,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: JSON.stringify(list, null, 2) }] };
     }
 
-    // ── get_schema ────────────────────────────────────────────────────────────
+    // get_schema
     if (name === "get_schema") {
       const ws = findWorkspace(String(a["workspace_id"]));
       const conn = getConn(ws);
@@ -391,7 +391,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: JSON.stringify(schema, null, 2) }] };
     }
 
-    // ── query_table ───────────────────────────────────────────────────────────
+    // query_table
     if (name === "query_table") {
       const ws = findWorkspace(String(a["workspace_id"]));
       const table = String(a["table_name"]);
@@ -430,7 +430,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
 
-    // ── execute_sql ───────────────────────────────────────────────────────────
+    // execute_sql
     if (name === "execute_sql") {
       const ws = findWorkspace(String(a["workspace_id"]));
       const sql = String(a["sql"]);
@@ -513,7 +513,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
 
-    // ── update_row ────────────────────────────────────────────────────────────
+    // update_row
     if (name === "update_row") {
       const ws = findWorkspace(String(a["workspace_id"]));
       const table = String(a["table_name"]);
@@ -546,7 +546,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: "Row updated successfully." }] };
     }
 
-    // ── delete_row ────────────────────────────────────────────────────────────
+    // delete_row
     if (name === "delete_row") {
       const ws = findWorkspace(String(a["workspace_id"]));
       const table = String(a["table_name"]);
@@ -601,7 +601,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-// ── HTTP + WebSocket server ────────────────────────────────────────────────────
+// HTTP + WebSocket server
 
 const transport = new StreamableHTTPServerTransport({
   sessionIdGenerator: () => crypto.randomUUID(),
