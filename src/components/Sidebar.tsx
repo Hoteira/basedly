@@ -98,7 +98,10 @@ export default function Sidebar({
             borderRadius: 4, lineHeight: 1,
           }}
         >
-          {theme === "dark" ? <Sun size={13} /> : <Moon size={13} />}
+          {theme === "dark"
+            ? <Sun size={13} style={{ color: "#f5c542" }} />
+            : <Moon size={13} style={{ color: "#f5c542" }} />
+          }
         </button>
       </div>
 
@@ -120,82 +123,62 @@ export default function Sidebar({
           const color = ws.color ?? COLORS[i % COLORS.length];
           const isActive = ws.id === activeWsId;
           const isConn = connected[ws.id];
+          const isHovered = hoveredWs === ws.id;
           return (
-            <div
+            <button
               key={ws.id}
-              style={{ position: "relative" }}
+              onClick={() => onSelectWorkspace(ws)}
               onMouseEnter={() => setHoveredWs(ws.id)}
               onMouseLeave={() => setHoveredWs(null)}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 8px",
+                borderRadius: 6,
+                background: isActive ? "var(--bg-3)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: isActive ? "var(--text-1)" : "var(--text-2)",
+                fontSize: 12,
+                fontWeight: isActive ? 500 : 400,
+                textAlign: "left",
+              }}
             >
-              <button
-                onClick={() => onSelectWorkspace(ws)}
+              <span
                 style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "6px 8px",
-                  borderRadius: 6,
-                  background: isActive ? "var(--bg-3)" : "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: isActive ? "var(--text-1)" : "var(--text-2)",
-                  fontSize: 12,
-                  fontWeight: isActive ? 500 : 400,
-                  textAlign: "left",
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: isConn ? color : "var(--bg-4)",
+                  flexShrink: 0,
                 }}
-              >
+              />
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {ws.name}
+              </span>
+              {/* Right slot: X on hover, DB icon otherwise — same space so name never shifts */}
+              {isHovered ? (
                 <span
+                  onClick={(e) => { e.stopPropagation(); onDeleteWorkspace(ws.id); }}
+                  title="Remove connection"
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: isConn ? color : "var(--bg-4)",
-                    flexShrink: 0,
+                    flexShrink: 0, display: "flex", alignItems: "center",
+                    color: "var(--text-3)", padding: "1px 2px", borderRadius: 3,
                   }}
-                />
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--red)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--text-3)"; }}
                 >
-                  {ws.name}
+                  <X size={14} />
                 </span>
+              ) : (
                 <span
                   title={ws.db_type === "sqlite" ? "SQLite" : "PostgreSQL"}
                   style={{ color: "var(--text-3)", flexShrink: 0, display: "flex", alignItems: "center" }}
                 >
                   {ws.db_type === "sqlite" ? <SiSqlite size={10} /> : <SiPostgresql size={10} />}
                 </span>
-              </button>
-              {hoveredWs === ws.id && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteWorkspace(ws.id);
-                  }}
-                  title="Remove connection"
-                  style={{
-                    position: "absolute",
-                    right: 6,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-3)",
-                    fontSize: 12,
-                    padding: "2px 4px",
-                    borderRadius: 4,
-                  }}
-                >
-                  <X size={12} />
-                </button>
               )}
-            </div>
+            </button>
           );
         })}
 

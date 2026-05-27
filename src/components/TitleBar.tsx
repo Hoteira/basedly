@@ -25,7 +25,11 @@ export default function TitleBar({ mcpConnected = false }: Props) {
     const onKeyDown = async (e: KeyboardEvent) => {
       if (e.key === "F11") {
         e.preventDefault();
-        const full = await appWindow.isFullscreen().catch(() => false);
+        const [full, max] = await Promise.all([
+          appWindow.isFullscreen().catch(() => false),
+          appWindow.isMaximized().catch(() => false),
+        ]);
+        if (!full && max) await appWindow.unmaximize().catch(() => {});
         appWindow.setFullscreen(!full).catch(() => {});
       }
     };

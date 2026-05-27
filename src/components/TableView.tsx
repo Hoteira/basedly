@@ -84,8 +84,8 @@ export default function TableView({
     display: "flex", alignItems: "center", gap: 5,
     padding: "3px 10px", borderRadius: 4, border: "none", cursor: "pointer",
     fontSize: 11, fontWeight: 500,
-    background: active ? "var(--bg-1)" : "transparent",
-    color: active ? "var(--text-1)" : "var(--text-3)",
+    background: active ? "var(--accent-subtle)" : "transparent",
+    color: active ? "var(--accent)" : "var(--text-3)",
     transition: "background 0.12s, color 0.12s",
   });
 
