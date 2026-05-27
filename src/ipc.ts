@@ -88,6 +88,12 @@ export const ipc = {
   saveFile: (path: string, content: string) =>
     invoke<void>("save_file", { path, content }),
 
+  runMcpAdd: (cli: string, name: string, url: string) =>
+    invoke<string>("run_mcp_add", { cli, name, url }),
+
+  runMcpList: (cli: string) =>
+    invoke<string>("run_mcp_list", { cli }),
+
   fetchRowByColumn: (
     workspaceId: string,
     tableName: string,

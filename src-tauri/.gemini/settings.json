@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "basedly": {
+      "url": "http://localhost:8453/mcp",
+      "type": "http"
+    }
+  }
+}

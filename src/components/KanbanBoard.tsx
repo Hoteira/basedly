@@ -248,7 +248,7 @@ export default function KanbanBoard({
       onDragEnd={handleDragEnd}
     >
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 16, padding: 20, overflowX: "auto", overflowY: "hidden", alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 16, padding: 20, overflow: "auto", alignItems: "flex-start" }}>
           {laneValues.map((lane) => {
             const laneRows = rows.filter((r) => String(r[groupCol.name] ?? "") === lane);
 

@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { Moon, Plus, Sun, Terminal, X } from "lucide-react";
+import { Moon, Plug, Plus, Sun, Terminal, X } from "lucide-react";
 import { SiPostgresql, SiSqlite } from "react-icons/si";
 import type { TableInfo, WorkspaceConfig } from "../types";
 
@@ -31,6 +31,7 @@ interface Props {
   onDeleteWorkspace: (id: string) => void;
   onToggleConsole: () => void;
   onToggleTheme: () => void;
+  onOpenMcp: () => void;
 }
 
 const COLORS = [
@@ -57,6 +58,7 @@ export default function Sidebar({
   onDeleteWorkspace,
   onToggleConsole,
   onToggleTheme,
+  onOpenMcp,
 }: Props) {
   const [hoveredWs, setHoveredWs] = useState<string | null>(null);
 
@@ -285,8 +287,32 @@ export default function Sidebar({
         </div>
       )}
 
-      {activeWsId && (
-        <div style={{ borderTop: "1px solid var(--border)", padding: "6px 8px", flexShrink: 0 }}>
+      <div style={{ borderTop: "1px solid var(--border)", flexShrink: 0, marginTop: "auto" }}>
+        <div style={{ padding: "6px 8px", borderBottom: activeWsId ? "1px solid var(--border)" : undefined }}>
+          <button
+            onClick={onOpenMcp}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 8px",
+              borderRadius: 6,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--text-3)",
+              fontSize: 12,
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "var(--text-1)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--text-3)"; }}
+          >
+            <Plug size={11} />
+            <span>MCP Servers</span>
+          </button>
+        </div>
+        {activeWsId && (
+          <div style={{ padding: "6px 8px" }}>
           <button
             onClick={onToggleConsole}
             style={{
@@ -307,8 +333,9 @@ export default function Sidebar({
             <Terminal size={11} />
             <span>SQL Console</span>
           </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </aside>
   );
 }

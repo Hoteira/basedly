@@ -6,6 +6,7 @@ import { Image as TauriImage } from "@tauri-apps/api/image";
 import { ipc } from "./ipc";
 import type { ColumnInfo, TableInfo, ViewMode, WorkspaceConfig } from "./types";
 import AddWorkspaceModal from "./components/AddWorkspaceModal";
+import McpPanel from "./components/McpPanel";
 import Sidebar from "./components/Sidebar";
 import SqlConsole from "./components/SqlConsole";
 import TableView from "./components/TableView";
@@ -83,6 +84,7 @@ export default function App() {
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showAddWs, setShowAddWs] = useState(false);
+  const [showMcp, setShowMcp] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     const saved = localStorage.getItem("theme");
     return saved === "light" ? "light" : "dark";
@@ -347,6 +349,7 @@ export default function App() {
           onAddWorkspace={() => setShowAddWs(true)}
           onDeleteWorkspace={handleDeleteWorkspace}
           onToggleConsole={() => setShowConsole((v) => !v)}
+          onOpenMcp={() => setShowMcp(true)}
           onToggleTheme={() =>
             setTheme((t) => (t === "dark" ? "light" : "dark"))
           }
@@ -403,6 +406,8 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {showMcp && <McpPanel onClose={() => setShowMcp(false)} />}
 
       {showAddWs && (
         <AddWorkspaceModal

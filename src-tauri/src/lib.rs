@@ -184,6 +184,51 @@ async fn fetch_row_by_column(
         .await
 }
 
+// ── MCP server management ─────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn run_mcp_list(cli: String) -> Result<String, String> {
+    #[cfg(windows)]
+    let output = std::process::Command::new("cmd")
+        .args(["/c", &cli, "mcp", "list"])
+        .output()
+        .map_err(|e| format!("{} CLI not found: {}", cli, e))?;
+
+    #[cfg(not(windows))]
+    let output = std::process::Command::new(&cli)
+        .args(["mcp", "list"])
+        .output()
+        .map_err(|e| format!("{} CLI not found: {}", cli, e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    Ok(stdout + &stderr)
+}
+
+#[tauri::command]
+async fn run_mcp_add(cli: String, name: String, url: String) -> Result<String, String> {
+    #[cfg(windows)]
+    let output = std::process::Command::new("cmd")
+        .args(["/c", &cli, "mcp", "add", "--transport", "http", &name, &url])
+        .output()
+        .map_err(|e| format!("{} CLI not found: {}", cli, e))?;
+
+    #[cfg(not(windows))]
+    let output = std::process::Command::new(&cli)
+        .args(["mcp", "add", "--transport", "http", &name, &url])
+        .output()
+        .map_err(|e| format!("{} CLI not found: {}", cli, e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(if stdout.is_empty() { "Added successfully".to_string() } else { stdout })
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Err(if !stderr.is_empty() { stderr } else if !stdout.is_empty() { stdout } else { "Command failed".to_string() })
+    }
+}
+
 // ── File picker for SQLite ─────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -264,6 +309,8 @@ pub fn run() {
             pick_sqlite_file,
             fetch_row_by_column,
             save_file,
+            run_mcp_add,
+            run_mcp_list,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Basedly")
