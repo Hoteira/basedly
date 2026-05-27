@@ -80,6 +80,11 @@ export default function App() {
     ipc.getWorkspaces().then(setWorkspaces).catch(console.error);
   }, []);
 
+  // Show window only after first render — avoids white/black flash on startup
+  useEffect(() => {
+    getCurrentWindow().show().catch(() => {});
+  }, []);
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
