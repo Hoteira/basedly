@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Download, Plus } from "lucide-react";
+import StatusBar from "./StatusBar";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ipc, rowPkValue } from "../ipc";
@@ -547,11 +548,7 @@ export default function DataGrid({
           </button>
         )}
 
-        <div style={{
-          flexShrink: 0, background: "var(--bg-1)", borderTop: "1px solid var(--border)",
-          padding: "9px 14px", fontSize: 11, color: "var(--text-3)",
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
+        <StatusBar>
           <span>{rows.length.toLocaleString()} / {totalCount.toLocaleString()} rows</span>
           {!hasPk && (
             <span style={{ color: "var(--yellow)", fontSize: 10 }}>no primary key - read-only</span>
@@ -590,7 +587,7 @@ export default function DataGrid({
               {exporting ? "Exporting…" : "Export CSV"}
             </button>
           </div>
-        </div>
+        </StatusBar>
       </div>
 
       {showInsert && (

@@ -15,6 +15,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { ipc, rowPkValue } from "../ipc";
 import type { ColumnInfo } from "../types";
+import StatusBar from "./StatusBar";
 
 interface Props {
   workspaceId: string;
@@ -247,7 +248,7 @@ export default function KanbanBoard({
       onDragEnd={handleDragEnd}
     >
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <div style={{ flex: 1, display: "flex", gap: 16, padding: 20, overflow: "auto", alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 16, padding: 20, overflowX: "auto", overflowY: "hidden", alignItems: "flex-start" }}>
           {laneValues.map((lane) => {
             const laneRows = rows.filter((r) => String(r[groupCol.name] ?? "") === lane);
 
@@ -275,13 +276,13 @@ export default function KanbanBoard({
           })}
         </div>
 
-        <div style={{ flexShrink: 0, background: "var(--bg-1)", borderTop: "1px solid var(--border)", padding: "5px 14px", fontSize: 11, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 4 }}>
+        <StatusBar>
           <span>{rows.length} / {totalCount} rows · grouped by</span>
 
           <div ref={menuRef} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
             <button
               onClick={() => setMenuOpen(v => !v)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 11, padding: "0 2px", borderRadius: 3, lineHeight: 1 }}
+              style={{ background: "transparent", border: "1px solid var(--border)", cursor: "pointer", color: "var(--accent)", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}
             >
               {groupCol.name} ▴
             </button>
@@ -308,7 +309,7 @@ export default function KanbanBoard({
               <AlertTriangle size={11} /> showing first 500
             </span>
           )}
-        </div>
+        </StatusBar>
       </div>
 
       <DragOverlay>
