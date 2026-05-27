@@ -63,6 +63,15 @@ async function applyWindowIcon(isDark: boolean) {
   }
 }
 
+async function applyWindowBackground(isDark: boolean) {
+  try {
+    const [r, g, b] = isDark ? [25, 25, 25] : [255, 255, 255];
+    await (getCurrentWindow() as any).setBackgroundColor({ r, g, b, a: 255 });
+  } catch {
+    // not supported on this platform/version
+  }
+}
+
 // Module-level flag so React StrictMode double-mount doesn't suppress the welcome toast
 let mcpWelcomeFired = false;
 
@@ -101,6 +110,7 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
     applyWindowIcon(theme === "dark");
+    applyWindowBackground(theme === "dark");
   }, [theme]);
 
   // Keep ref in sync so WS callback always sees current active workspace

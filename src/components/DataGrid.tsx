@@ -523,7 +523,7 @@ export default function DataGrid({
             onClick={() => setShowInsert(true)}
             title="Insert new row"
             style={{
-              position: "absolute", bottom: 54, right: 24, zIndex: 20,
+              position: "absolute", bottom: 54, right: 15, zIndex: 20,
               display: "flex", alignItems: "center", gap: 5,
               background: "#5b9cf6", color: "#fff",
               border: "none", borderRadius: 7,
