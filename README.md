@@ -44,7 +44,7 @@ cd mcp && npm install && npm run build && cd ..
 npm run tauri dev
 ```
 
-for the Claude integration add this to claude desktop config or whatever MCP thing you use:
+for the Claude integration add this to claude desktop config or whatever MCP thing you use (or you can just use the GUI's menu):
 
 ```json
 {
