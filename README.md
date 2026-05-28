@@ -14,21 +14,25 @@
 
 <br>
 
-## what is this
+## What is this
 
-its a desktop app for looking at postgres/sqlite databases. you connect it to your database and it shows you the tables and lets you edit stuff without writing SQL. i built it because i was bored
+This is not supposed to be like a super enterprise serious project, just hope sombody will find it useful. 
 
-it also has this thing where you can connect Claude to it and the AI can mess with your database and you can see what its doing in real time which is actually pretty cool ngl
+Its a desktop app for looking at postgres/sqlite (and others in the future) databases. You connect it to your database and it shows you the tables and lets you edit stuff without writing SQL (you can if you want but it's not a constraint).
+I built it because i was bored and fatigued by everything having a subscription for no reason.
 
-## stuff it can do
+It allows you to connect Claude or Gemini to it and the AI can mess with your database and you can see what its doing in real time.
+It has notification on the GUI for each action the AI does and a button to revert deleted rows so y'all can fix the mess after posting on X.
+
+## Stuff it can do
 
 - you can see all your table data in a grid and double click cells to edit them
 - theres a little side panel that slides out when you click a row
 - if you have an enum column it turns into a kanban board and you can drag cards around and it actually saves to the db
-- theres a sql console if you want to just type queries
+- there's a sql console if you want to just type queries
 - you can export to csv
 - dark mode (obviously)
-- the AI thing (MCP) - you can point Claude at it and it can query your databases. it shows you notifications when the AI does something and you can undo deletes which is cool
+- MCP - you can point Claude or Gemini at it and it can query your databases. it shows you notifications when the AI does something
 - passwords are encrypted so theyre not just sitting in a text file
 
 ## how to run
@@ -69,7 +73,7 @@ for the Claude integration add this to claude desktop config or whatever MCP thi
 | `update_row` | updates a cell |
 | `delete_row` | deletes a row (saves it first so you can undo) |
 
-## stuff i used
+## Stuff i used
 
 react, typescript, rust, tauri, tailwind. the virtual scrolling is TanStack Virtual so it doesnt die on big tables
 
