@@ -16,7 +16,7 @@
 
 <div align="center">
 
-https://github.com/Hoteira/basedly/raw/master/video.mp4
+<video src="https://github.com/Hoteira/basedly/blob/1960b9f61894da9bacee6728ce422e203b25b21f/video.mp4" controls width="480" height="270"></video>
 
 </div>
 
