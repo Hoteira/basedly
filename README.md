@@ -14,26 +14,35 @@
 
 <br>
 
+<div align="center">
+
+https://github.com/Hoteira/basedly/raw/master/video.mp4
+
+</div>
+
+<br>
+
 ## What is this
 
-This is not supposed to be like a super enterprise serious project, just hope sombody will find it useful. 
+Not supposed to be a super enterprise serious project, just hope somebody finds it useful.
 
-Its a desktop app for looking at postgres/sqlite (and others in the future) databases. You connect it to your database and it shows you the tables and lets you edit stuff without writing SQL (you can if you want but it's not a constraint).
-I built it because i was bored and fatigued by everything having a subscription for no reason.
+Its a desktop database client for postgres + sqlite (others coming). Two things make it different from the 47 other ones:
 
-It allows you to connect Claude or Gemini to it and the AI can mess with your database and you can see what its doing in real time.
-It has notification on the GUI for each action the AI does and a button to revert deleted rows so y'all can fix the mess after posting on X.
+1. You can point Claude or Gemini at it and watch the AI edit your db live, with one-click undo when it inevitably screws something up. GUI notifications for every action the AI does so y'all can fix the mess after posting on X.
+2. It doesnt look like it was designed in 2008. Rows open into notion-style pages, enum columns turn into kanban boards, dark mode obviously.
+
+I built it because i was bored and fatigued by everything having a subscription for no reason. You can write SQL if you want but it's not a constraint.
 
 ## Stuff it can do
 
-- you can see all your table data in a grid and double click cells to edit them
-- theres a little side panel that slides out when you click a row
-- if you have an enum column it turns into a kanban board and you can drag cards around and it actually saves to the db
-- there's a sql console if you want to just type queries
-- you can export to csv
+- MCP - point Claude or Gemini at it and watch what it does to your db live, with notifications + undo on deletes
+- rows open into a notion-style side panel — booleans become toggles, json gets pretty-printed, etc
+- enum columns turn into a kanban board and dragging cards actually saves to the db
+- normal grid view with double-click cell editing for when you just need to fix a value
+- sql console if you want to type queries
+- csv export
 - dark mode (obviously)
-- MCP - you can point Claude or Gemini at it and it can query your databases. it shows you notifications when the AI does something
-- passwords are encrypted so theyre not just sitting in a text file
+- passwords go in the OS keyring not a config file
 
 ## how to run
 
