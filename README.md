@@ -16,8 +16,8 @@
 
 <div align="center">
 
-[<video src="https://github.com/Hoteira/basedly/blob/1960b9f61894da9bacee6728ce422e203b25b21f/video.mp4" controls width="480" height="270"></video>
-](https://github.com/user-attachments/assets/c77d902a-dceb-4140-9b25-ffd077de9497)
+[<video src="https://github.com/user-attachments/assets/50f0ab38-8034-4bf6-98bc-db67437ad05c" controls width="480" height="270"></video>
+](https://github.com/user-attachments/assets/50f0ab38-8034-4bf6-98bc-db67437ad05c)
 
 </div>
 
