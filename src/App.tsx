@@ -120,78 +120,48 @@ export default function App() {
     activeWsIdRef.current = activeWsId;
   }, [activeWsId]);
 
-  // WebSocket connection to MCP sidecar for real-time mutation events
+  // MCP server runs in-process — listen for mutation events emitted by the Rust backend
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let destroyed = false;
-
-    function connect() {
-      if (destroyed) return;
-      ws = new WebSocket("ws://localhost:8453");
-
-      ws.onopen = () => {
-        setWsConnected(true);
-        if (!mcpWelcomeFired) {
-          mcpWelcomeFired = true;
-          const welcome: McpToast = {
-            id: crypto.randomUUID(),
-            type: "other",
-            agent: "Basedly",
-            workspaceId: "",
-            summary:
-              "MCP sidecar is live - AI agents can now query your databases",
-            ts: Date.now(),
-          };
-          setMcpToasts((prev) => [...prev, welcome]);
-        }
-      };
-
-      ws.onmessage = (ev) => {
-        try {
-          const event = JSON.parse(ev.data as string) as McpToast;
-          const toast: McpToast = { ...event, id: crypto.randomUUID() };
-
-          setMcpToasts((prev) => [...prev.slice(-4), toast]);
-
-          const isMutation =
-            toast.type === "update" ||
-            toast.type === "delete" ||
-            toast.type === "insert" ||
-            toast.type === "ddl";
-          if (isMutation && toast.workspaceId === activeWsIdRef.current) {
-            setRefreshKey((k) => k + 1);
-          }
-          if (
-            toast.type === "ddl" &&
-            toast.workspaceId === activeWsIdRef.current
-          ) {
-            const wsId = activeWsIdRef.current;
-            if (wsId) ipc.getSchema(wsId).then(setSchema).catch(console.error);
-          }
-        } catch {
-          // ignore malformed messages
-        }
-      };
-
-      ws.onclose = () => {
-        setWsConnected(false);
-        if (!destroyed) reconnectTimer = setTimeout(connect, 3000);
-      };
-
-      ws.onerror = () => {
-        ws?.close();
-      };
+    setWsConnected(true);
+    if (!mcpWelcomeFired) {
+      mcpWelcomeFired = true;
+      setMcpToasts((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: "other",
+          agent: "Basedly",
+          workspaceId: "",
+          summary: "MCP is live - AI agents can now query your databases",
+          ts: Date.now(),
+        },
+      ]);
     }
 
-    connect();
+    let unlisten: (() => void) | undefined;
+    listen<McpToast>("mcp-event", (event) => {
+      const toast: McpToast = { ...event.payload, id: crypto.randomUUID() };
+      setMcpToasts((prev) => [...prev.slice(-4), toast]);
+
+      const isMutation =
+        toast.type === "update" ||
+        toast.type === "delete" ||
+        toast.type === "insert" ||
+        toast.type === "ddl";
+      if (isMutation && toast.workspaceId === activeWsIdRef.current) {
+        setRefreshKey((k) => k + 1);
+      }
+      if (toast.type === "ddl" && toast.workspaceId === activeWsIdRef.current) {
+        const wsId = activeWsIdRef.current;
+        if (wsId) ipc.getSchema(wsId).then(setSchema).catch(console.error);
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
 
     return () => {
-      destroyed = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      ws?.close();
+      unlisten?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Live reload when SQLite file changes on disk

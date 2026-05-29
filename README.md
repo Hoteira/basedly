@@ -44,18 +44,33 @@ I built it because i was bored and fatigued by everything having a subscription 
 - dark mode (obviously)
 - passwords go in the OS keyring not a config file
 
-## how to run
+## Download
 
-need Rust and Node installed
+grab the latest release for your platform:
+
+- [**Windows**](https://github.com/Hoteira/basedly/releases/latest) — `.msi` or `.exe`
+- [**Linux**](https://github.com/Hoteira/basedly/releases/latest) — `.AppImage` (works on any distro, `chmod +x` and run), `.deb`, or `.rpm`
+
+mac coming when i feel like paying Apple $99/yr to sign it
+
+## Build from source
+
+if you want to build it yourself, need Rust and Node installed:
 
 ```bash
 npm install
 
-# this part is for the AI stuff
-cd mcp && npm install && npm run build && cd ..
-
+# run in dev mode (hot reload)
 npm run tauri dev
+
+# OR build a release binary + installers
+npm run tauri build
 ```
+
+after `tauri build` you'll find:
+
+- raw exe: `src-tauri/target/release/basedly.exe` (or `basedly` on linux)
+- installers: `src-tauri/target/release/bundle/` (msi/nsis on windows, deb/rpm/AppImage on linux)
 
 for the Claude integration add this to claude desktop config or whatever MCP thing you use (or you can just use the GUI's menu):
 
