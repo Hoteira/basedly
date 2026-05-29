@@ -29,8 +29,8 @@ Not supposed to be a super enterprise serious project, just hope somebody finds 
 
 Its a desktop database client for postgres + sqlite (others coming). Two things make it different from the 47 other ones:
 
-1. You can point Claude or Gemini at it and watch the AI edit your db live, with one-click undo when it inevitably screws something up. GUI notifications for every action the AI does so y'all can fix the mess after posting on X.
-2. It doesnt look like it was designed in 2008. Rows open into notion-style pages, enum columns turn into kanban boards, dark mode obviously.
+1. You can point Claude or Gemini at it and watch the AI edit your db live, with one-click undo when it inevitably screws something up. Can reverse whatever the AI does so y'all can fix the mess after posting it on X. I see you.
+2. It doesnt look like it was designed in 2008.
 
 I built it because i was bored and fatigued by everything having a subscription for no reason. You can write SQL if you want but it's not a constraint.
 
