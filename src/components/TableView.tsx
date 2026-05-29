@@ -83,7 +83,7 @@ export default function TableView({
     fontSize: 11, fontWeight: 500,
     background: active ? "var(--accent-subtle)" : "transparent",
     color: active ? "var(--accent)" : "var(--text-3)",
-    transition: "background 0.12s, color 0.12s",
+    transition: "background 0.12s var(--ease-snap), color 0.12s var(--ease-snap), transform 0.16s var(--ease-spring)",
   });
 
   const iconBtnStyle = (active: boolean): React.CSSProperties => ({
@@ -92,7 +92,7 @@ export default function TableView({
     fontSize: 11, fontWeight: 500,
     background: active ? "var(--accent-subtle)" : "transparent",
     color: active ? "var(--accent)" : "var(--text-3)",
-    transition: "background 0.12s, color 0.12s",
+    transition: "background 0.12s var(--ease-snap), color 0.12s var(--ease-snap), transform 0.16s var(--ease-spring)",
   });
 
   return (
@@ -107,6 +107,7 @@ export default function TableView({
 
         <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
           <button
+            className="tactile"
             onClick={() => filterOpen ? closeFilter() : setFilterOpen(true)}
             title="Filter (Ctrl+F)"
             style={iconBtnStyle(filterOpen || !!filterVal)}
@@ -123,10 +124,10 @@ export default function TableView({
           </button>
 
           <div style={{ display: "flex", background: "var(--bg-3)", borderRadius: 6, padding: 2 }}>
-            <button onClick={() => onViewModeChange("grid")} style={btnStyle(viewMode === "grid")}>
+            <button className="tactile" onClick={() => onViewModeChange("grid")} style={btnStyle(viewMode === "grid")}>
               <LayoutGrid size={11} /> Grid
             </button>
-            <button onClick={() => onViewModeChange("kanban")} style={btnStyle(viewMode === "kanban")}>
+            <button className="tactile" onClick={() => onViewModeChange("kanban")} style={btnStyle(viewMode === "kanban")}>
               <Columns3 size={11} /> Kanban
             </button>
           </div>
@@ -205,27 +206,33 @@ export default function TableView({
       )}
 
       <div style={{ flex: 1, overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
-        {viewMode === "grid" || !groupCol ? (
-          <DataGrid
-            key={tableName}
-            workspaceId={workspaceId}
-            tableName={tableName}
-            columns={columns}
-            refreshKey={refreshKey}
-            onRowOpen={setPeekRow}
-            filterCol={filterVal ? filterCol : undefined}
-            filterVal={filterVal || undefined}
-          />
-        ) : (
-          <KanbanBoard
-            workspaceId={workspaceId}
-            tableName={tableName}
-            columns={columns}
-            groupCol={groupCol}
-            onCardOpen={setPeekRow}
-            onGroupColChange={(col) => setKanbanColName(col.name)}
-          />
-        )}
+        <div
+          key={`${tableName}:${viewMode}`}
+          className="content-enter"
+          style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+        >
+          {viewMode === "grid" || !groupCol ? (
+            <DataGrid
+              key={tableName}
+              workspaceId={workspaceId}
+              tableName={tableName}
+              columns={columns}
+              refreshKey={refreshKey}
+              onRowOpen={setPeekRow}
+              filterCol={filterVal ? filterCol : undefined}
+              filterVal={filterVal || undefined}
+            />
+          ) : (
+            <KanbanBoard
+              workspaceId={workspaceId}
+              tableName={tableName}
+              columns={columns}
+              groupCol={groupCol}
+              onCardOpen={setPeekRow}
+              onGroupColChange={(col) => setKanbanColName(col.name)}
+            />
+          )}
+        </div>
 
         <SidePeek
           row={peekRow}

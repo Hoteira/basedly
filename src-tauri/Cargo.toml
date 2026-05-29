@@ -1,6 +1,6 @@
 [package]
 name = "basedly"
-version = "0.1.1"
+version = "0.1.2"
 description = "The No-Nonsense, Local-First Database Workspace"
 authors = ["Hoteira"]
 edition = "2021"
@@ -36,6 +36,7 @@ base64 = "0.22"
 rand = "0.8"
 notify = "6"
 axum = "0.7"
+futures = "0.3"
 
 [features]
 default = ["custom-protocol"]

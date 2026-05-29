@@ -91,6 +91,7 @@ export default function Sidebar({
           </span>
         </div>
         <button
+          className="tactile"
           onClick={onToggleTheme}
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           style={{
@@ -127,6 +128,7 @@ export default function Sidebar({
           return (
             <button
               key={ws.id}
+              className="tactile"
               onClick={() => onSelectWorkspace(ws)}
               onMouseEnter={() => setHoveredWs(ws.id)}
               onMouseLeave={() => setHoveredWs(null)}
@@ -137,7 +139,11 @@ export default function Sidebar({
                 gap: 8,
                 padding: "6px 8px",
                 borderRadius: 6,
-                background: isActive ? "var(--bg-3)" : "transparent",
+                background: isActive
+                  ? "var(--bg-3)"
+                  : isHovered
+                  ? "var(--bg-2)"
+                  : "transparent",
                 border: "none",
                 cursor: "pointer",
                 color: isActive ? "var(--text-1)" : "var(--text-2)",
@@ -156,7 +162,7 @@ export default function Sidebar({
               <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {ws.name}
               </span>
-              {/* Right slot: X on hover, DB icon otherwise - same space so name never shifts */}
+              {/* X on hover, db icon otherwise */}
               {isHovered ? (
                 <span
                   onClick={(e) => { e.stopPropagation(); onDeleteWorkspace(ws.id); }}
@@ -183,6 +189,7 @@ export default function Sidebar({
         })}
 
         <button
+          className="nav-item"
           onClick={onAddWorkspace}
           style={{
             width: "100%",
@@ -191,7 +198,6 @@ export default function Sidebar({
             gap: 8,
             padding: "6px 8px",
             borderRadius: 6,
-            background: "transparent",
             border: "none",
             cursor: "pointer",
             color: "var(--text-2)",
@@ -227,19 +233,24 @@ export default function Sidebar({
           </div>
 
           {schemaLoading ? (
-            <div
-              style={{
-                padding: "8px 8px",
-                color: "var(--text-3)",
-                fontSize: 11,
-              }}
-            >
-              Loading…
+            <div style={{ padding: "4px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="skeleton"
+                  style={{
+                    height: 13,
+                    width: `${55 + ((i * 37) % 40)}%`,
+                    opacity: 1 - i * 0.12,
+                  }}
+                />
+              ))}
             </div>
           ) : (
             schema.map((t) => (
               <button
                 key={t.name}
+                className={`nav-item${t.name === activeTable ? " active" : ""}`}
                 onClick={() => onSelectTable(t.name)}
                 style={{
                   width: "100%",
@@ -248,8 +259,6 @@ export default function Sidebar({
                   justifyContent: "space-between",
                   padding: "5px 8px",
                   borderRadius: 5,
-                  background:
-                    t.name === activeTable ? "var(--bg-3)" : "transparent",
                   border: "none",
                   cursor: "pointer",
                   color:
@@ -290,6 +299,7 @@ export default function Sidebar({
       <div style={{ borderTop: "1px solid var(--border)", flexShrink: 0, marginTop: "auto" }}>
         <div style={{ padding: "6px 8px", borderBottom: activeWsId ? "1px solid var(--border)" : undefined }}>
           <button
+            className="nav-item"
             onClick={onOpenMcp}
             style={{
               width: "100%",
@@ -298,7 +308,6 @@ export default function Sidebar({
               gap: 8,
               padding: "6px 8px",
               borderRadius: 6,
-              background: "transparent",
               border: "none",
               cursor: "pointer",
               color: "var(--text-3)",
@@ -314,6 +323,7 @@ export default function Sidebar({
         {activeWsId && (
           <div style={{ padding: "6px 8px" }}>
           <button
+            className={`nav-item${showConsole ? " active" : ""}`}
             onClick={onToggleConsole}
             style={{
               width: "100%",
@@ -322,7 +332,6 @@ export default function Sidebar({
               gap: 8,
               padding: "6px 8px",
               borderRadius: 6,
-              background: showConsole ? "var(--bg-3)" : "transparent",
               border: "none",
               cursor: "pointer",
               color: showConsole ? "var(--text-1)" : "var(--text-3)",

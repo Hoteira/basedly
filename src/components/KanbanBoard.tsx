@@ -314,7 +314,17 @@ export default function KanbanBoard({
 
       <DragOverlay>
         {activeRow && (
-          <div className="kanban-card" style={{ opacity: 0.95, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", cursor: "grabbing" }}>
+          <div
+            className="kanban-card"
+            style={{
+              opacity: 0.95,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+              cursor: "grabbing",
+              // dnd-kit sets transform each frame, don't transition it or it lags
+              transition: "none",
+              transform: "rotate(1.5deg) scale(1.03)",
+            }}
+          >
             <CardContent row={activeRow} columns={columns} onOpen={() => {}} />
           </div>
         )}

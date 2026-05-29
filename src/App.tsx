@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -8,13 +8,14 @@ import type { ColumnInfo, TableInfo, ViewMode, WorkspaceConfig } from "./types";
 import AddWorkspaceModal from "./components/AddWorkspaceModal";
 import McpPanel from "./components/McpPanel";
 import Sidebar from "./components/Sidebar";
-import SqlConsole from "./components/SqlConsole";
 import TableView from "./components/TableView";
 import TitleBar from "./components/TitleBar";
 import McpToastItem, { type McpToast } from "./components/McpToast";
 
-// Draws the isometric cube (no background) onto a canvas and returns PNG bytes.
-// These are the same parallelogram faces as the SVG, computed analytically.
+// lazy so codemirror stays out of the startup bundle
+const SqlConsole = lazy(() => import("./components/SqlConsole"));
+
+// draw the cube icon to a canvas, return PNG bytes
 function drawCubeIcon(
   size: number,
   strokeColor: string,
@@ -73,7 +74,7 @@ async function applyWindowBackground(isDark: boolean) {
   }
 }
 
-// Module-level flag so React StrictMode double-mount doesn't suppress the welcome toast
+// module flag so StrictMode double-mount doesn't dupe the welcome toast
 let mcpWelcomeFired = false;
 
 export default function App() {
@@ -101,7 +102,7 @@ export default function App() {
     ipc.getWorkspaces().then(setWorkspaces).catch(console.error);
   }, []);
 
-  // Show window only after first render - avoids white/black flash on startup
+  // show window after first render to avoid startup flash
   useEffect(() => {
     getCurrentWindow()
       .show()
@@ -115,12 +116,12 @@ export default function App() {
     applyWindowBackground(theme === "dark");
   }, [theme]);
 
-  // Keep ref in sync so WS callback always sees current active workspace
+  // keep ref in sync for the event callback
   useEffect(() => {
     activeWsIdRef.current = activeWsId;
   }, [activeWsId]);
 
-  // MCP server runs in-process — listen for mutation events emitted by the Rust backend
+  // listen for mutation events from the backend
   useEffect(() => {
     setWsConnected(true);
     if (!mcpWelcomeFired) {
@@ -244,7 +245,7 @@ export default function App() {
     setMcpToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Ctrl+Shift+T - fire a test toast to verify the notification system
+  // Ctrl+Shift+T fires a test toast
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "T" && e.ctrlKey && e.shiftKey) {
@@ -369,10 +370,14 @@ export default function App() {
           )}
 
           {showConsole && activeWsId && (
-            <SqlConsole
-              workspaceId={activeWsId}
-              onClose={() => setShowConsole(false)}
-            />
+            <Suspense fallback={null}>
+              <SqlConsole
+                workspaceId={activeWsId}
+                schema={schema}
+                dbType={workspaces.find((w) => w.id === activeWsId)?.db_type}
+                onClose={() => setShowConsole(false)}
+              />
+            </Suspense>
           )}
         </main>
       </div>

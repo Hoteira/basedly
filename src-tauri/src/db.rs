@@ -2,14 +2,25 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::postgres::{PgPool, PgRow};
+use futures::TryStreamExt;
+use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
-use sqlx::{Column, Row, TypeInfo};
+use sqlx::{Column, Executor, Row, TypeInfo};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use uuid::Uuid;
+
+/// wall-clock limit per query so a runaway can't hang a connection
+const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// row cap for raw execute_query (paged paths already LIMIT)
+const MAX_EXEC_ROWS: usize = 50_000;
+
+/// postgres statement_timeout per connection (ms)
+const PG_STATEMENT_TIMEOUT_MS: u64 = 30_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForeignKeyInfo {
@@ -70,7 +81,20 @@ impl DbManager {
 
     pub async fn connect(&self, workspace_id: &str, conn_str: &str) -> Result<(), String> {
         let kind = if is_postgres(conn_str) {
-            let pool = PgPool::connect(conn_str).await.map_err(|e| e.to_string())?;
+            // statement_timeout so the db aborts runaway queries
+            let pool = PgPoolOptions::new()
+                .after_connect(|conn, _meta| {
+                    Box::pin(async move {
+                        conn.execute(
+                            format!("SET statement_timeout = {}", PG_STATEMENT_TIMEOUT_MS).as_str(),
+                        )
+                        .await?;
+                        Ok(())
+                    })
+                })
+                .connect(conn_str)
+                .await
+                .map_err(|e| e.to_string())?;
             PoolKind::Postgres(pool)
         } else {
             let normalized = normalize_sqlite(conn_str);
@@ -87,7 +111,7 @@ impl DbManager {
     }
 
     pub fn disconnect(&self, workspace_id: &str) {
-        // Drop watcher first so the background thread stops before the pool closes
+        // drop watcher before pool so its thread stops first
         if let Ok(mut w) = self.watchers.lock() {
             w.remove(workspace_id);
         }
@@ -96,9 +120,7 @@ impl DbManager {
         }
     }
 
-    /// Start watching a SQLite file for external changes.
-    /// Emits the Tauri event "db-file-changed" with the workspace_id payload
-    /// at most once every 400 ms to avoid flooding the UI.
+    /// watch a SQLite file, emit "db-file-changed" throttled to 400ms
     pub fn start_sqlite_watch(
         &self,
         workspace_id: &str,
@@ -239,9 +261,20 @@ impl DbManager {
         workspace_id: &str,
         sql: &str,
     ) -> Result<Vec<HashMap<String, Value>>, String> {
-        match self.get_kind(workspace_id)? {
-            PoolKind::Postgres(p) => exec_pg(&p, sql).await,
-            PoolKind::Sqlite(p) => exec_sqlite(&p, sql).await,
+        let kind = self.get_kind(workspace_id)?;
+        let fut = async move {
+            match kind {
+                PoolKind::Postgres(p) => exec_pg(&p, sql).await,
+                PoolKind::Sqlite(p) => exec_sqlite(&p, sql).await,
+            }
+        };
+        // wall-clock guard, main protection for sqlite
+        match tokio::time::timeout(QUERY_TIMEOUT, fut).await {
+            Ok(result) => result,
+            Err(_) => Err(format!(
+                "Query exceeded the {}s time limit and was cancelled.",
+                QUERY_TIMEOUT.as_secs()
+            )),
         }
     }
 
@@ -270,8 +303,6 @@ impl DbManager {
     }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
 fn not_connected(id: &str) -> String {
     format!("No active connection for workspace '{}'", id)
 }
@@ -284,9 +315,9 @@ pub fn normalize_sqlite(path: &str) -> String {
     if path.starts_with("sqlite:") {
         return path.to_string();
     }
-    // Windows backslashes → forward slashes, prefix with sqlite:
+    // windows backslashes to forward slashes
     let forward = path.replace('\\', "/");
-    // On Windows absolute paths look like C:/... — sqlx needs sqlite://C:/...
+    // windows abs paths (C:/...) need sqlite:///
     if forward.len() >= 2 && forward.chars().nth(1) == Some(':') {
         format!("sqlite:///{}", forward)
     } else {
@@ -326,8 +357,6 @@ fn val_to_str(v: &Value) -> Option<String> {
         other => Some(other.to_string()),
     }
 }
-
-// ── PostgreSQL schema ──────────────────────────────────────────────────────────
 
 async fn get_schema_pg(pool: &PgPool) -> Result<Vec<TableInfo>, String> {
     let names: Vec<String> = sqlx::query_scalar(
@@ -460,8 +489,6 @@ async fn table_exists_pg(pool: &PgPool, table: &str) -> Result<bool, String> {
     .map_err(|e| e.to_string())
 }
 
-// ── PostgreSQL queries ─────────────────────────────────────────────────────────
-
 async fn query_table_pg(
     pool: &PgPool,
     table: &str,
@@ -539,11 +566,16 @@ async fn delete_row_pg(
 }
 
 async fn exec_pg(pool: &PgPool, sql: &str) -> Result<Vec<HashMap<String, Value>>, String> {
-    let rows = sqlx::query(sql)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(rows.iter().map(pg_row_to_map).collect())
+    // stream and cap so a huge result can't blow up memory
+    let mut stream = sqlx::query(sql).fetch(pool);
+    let mut out = Vec::new();
+    while let Some(row) = stream.try_next().await.map_err(|e| e.to_string())? {
+        out.push(pg_row_to_map(&row));
+        if out.len() >= MAX_EXEC_ROWS {
+            break;
+        }
+    }
+    Ok(out)
 }
 
 fn pg_row_to_map(row: &PgRow) -> HashMap<String, Value> {
@@ -587,8 +619,6 @@ fn pg_type_cast(col_type: &str) -> &'static str {
     else if t.contains("timestamp") { "::timestamptz" }
     else { "" }
 }
-
-// ── SQLite schema ──────────────────────────────────────────────────────────────
 
 async fn get_schema_sqlite(pool: &SqlitePool) -> Result<Vec<TableInfo>, String> {
     let names: Vec<String> = sqlx::query_scalar(
@@ -667,8 +697,6 @@ async fn table_exists_sqlite(pool: &SqlitePool, table: &str) -> Result<bool, Str
     .map_err(|e| e.to_string())
 }
 
-// ── SQLite queries ─────────────────────────────────────────────────────────────
-
 async fn query_table_sqlite(
     pool: &SqlitePool,
     table: &str,
@@ -741,11 +769,15 @@ async fn delete_row_sqlite(
 }
 
 async fn exec_sqlite(pool: &SqlitePool, sql: &str) -> Result<Vec<HashMap<String, Value>>, String> {
-    let rows = sqlx::query(sql)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(rows.iter().map(sqlite_row_to_map).collect())
+    let mut stream = sqlx::query(sql).fetch(pool);
+    let mut out = Vec::new();
+    while let Some(row) = stream.try_next().await.map_err(|e| e.to_string())? {
+        out.push(sqlite_row_to_map(&row));
+        if out.len() >= MAX_EXEC_ROWS {
+            break;
+        }
+    }
+    Ok(out)
 }
 
 fn sqlite_row_to_map(row: &SqliteRow) -> HashMap<String, Value> {
@@ -783,8 +815,17 @@ fn extract_sqlite(row: &SqliteRow, idx: usize, type_name: &str) -> Value {
             .map(Value::Bool)
             .unwrap_or(Value::Null),
         _ => {
+            // computed columns (COUNT, SUM) have no declared type, probe int/real/text
+            if let Ok(Some(i)) = row.try_get::<Option<i64>, _>(idx) {
+                return Value::Number(i.into());
+            }
+            if let Ok(Some(f)) = row.try_get::<Option<f64>, _>(idx) {
+                if let Some(n) = serde_json::Number::from_f64(f) {
+                    return Value::Number(n);
+                }
+            }
             if let Ok(Some(s)) = row.try_get::<Option<String>, _>(idx) {
-                // Auto-parse JSON stored as text
+                // parse JSON stored as text
                 if s.starts_with('{') || s.starts_with('[') {
                     if let Ok(v) = serde_json::from_str(&s) {
                         return v;
@@ -798,8 +839,6 @@ fn extract_sqlite(row: &SqliteRow, idx: usize, type_name: &str) -> Value {
     }
 }
 
-// ── Shared helpers ─────────────────────────────────────────────────────────────
-
 fn order_clause(sort_col: Option<&str>, sort_asc: bool) -> String {
     match sort_col {
         Some(col) if is_safe_identifier(col) => {
@@ -808,8 +847,6 @@ fn order_clause(sort_col: Option<&str>, sort_asc: bool) -> String {
         _ => String::new(),
     }
 }
-
-// ── test_connection (used by add-workspace modal) ──────────────────────────────
 
 pub async fn test_connection(conn_str: &str) -> Result<(), String> {
     if is_postgres(conn_str) {

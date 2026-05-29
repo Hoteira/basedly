@@ -59,11 +59,11 @@ function buildWhere(filterCol: string, filterVal: string): string {
 
 function csvEscape(s: string): string {
   return s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")
-    ? `"${s.replace(/"/g, '""')}'`
+    ? `"${s.replace(/"/g, '""')}"`
     : s;
 }
 
-// Build a SQL literal from a string value + column type, used for composite-PK updates.
+// SQL literal for composite-PK updates
 function toSqlLiteral(value: string, dataType: string): string {
   if (value === "") return "NULL";
   const t = dataType.toLowerCase();
@@ -98,6 +98,8 @@ export default function DataGrid({
   const [editVal, setEditVal] = useState("");
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+  // cell that just saved, drives the green flash
+  const [savedCell, setSavedCell] = useState<{ rowIdx: number; colName: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [showInsert, setShowInsert] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -111,7 +113,7 @@ export default function DataGrid({
   const [containerWidth, setContainerWidth] = useState(0);
   const initializedRef = useRef(false);
 
-  // Column resize hover/active tracking - drives column-wide border highlight
+  // resize hover/active for the border highlight
   const [hoverResizeCol, setHoverResizeCol] = useState<number | null>(null);
   const [resizingCol, setResizingCol] = useState<number | null>(null);
 
@@ -261,38 +263,41 @@ export default function DataGrid({
 
   const commitEdit = async () => {
     if (!editing) return;
-    const row = rows[editing.rowIdx];
-    const col = columns.find((c) => c.name === editing.colName);
+    const target = editing;
+    const row = rows[target.rowIdx];
+    const col = columns.find((c) => c.name === target.colName);
     if (!col || !hasPk) { setEditing(null); return; }
 
-    const oldVal = row[editing.colName];
+    const oldVal = row[target.colName];
     if (String(oldVal) === editVal) { setEditing(null); return; }
 
     setRows((prev) =>
-      prev.map((r, i) => (i === editing.rowIdx ? { ...r, [editing.colName]: editVal } : r))
+      prev.map((r, i) => (i === target.rowIdx ? { ...r, [target.colName]: editVal } : r))
     );
+    setEditing(null);
     try {
       if (pkCols.length === 1) {
         const pk = rowPkValue(row, columns);
-        await ipc.updateRow(workspaceId, tableName, pkCols[0].name, pk, editing.colName, editVal, col.data_type);
+        await ipc.updateRow(workspaceId, tableName, pkCols[0].name, pk, target.colName, editVal, col.data_type);
       } else {
-        // Composite PK - build raw SQL
+        // composite PK, raw SQL
         const where = pkCols
           .map((pk) => `"${pk.name}" = ${toSqlLiteral(String(row[pk.name] ?? ""), pk.data_type)}`)
           .join(" AND ");
         const newLiteral = toSqlLiteral(editVal, col.data_type);
         await ipc.executeQuery(
           workspaceId,
-          `UPDATE "${tableName}" SET "${editing.colName}" = ${newLiteral} WHERE ${where}`
+          `UPDATE "${tableName}" SET "${target.colName}" = ${newLiteral} WHERE ${where}`
         );
       }
+      // flash the cell green on success
+      setSavedCell({ rowIdx: target.rowIdx, colName: target.colName });
     } catch (e) {
       setRows((prev) =>
-        prev.map((r, i) => (i === editing.rowIdx ? { ...r, [editing.colName]: oldVal } : r))
+        prev.map((r, i) => (i === target.rowIdx ? { ...r, [target.colName]: oldVal } : r))
       );
       console.error(e);
     }
-    setEditing(null);
   };
 
   const handleSort = (colName: string) => {
@@ -437,10 +442,14 @@ export default function DataGrid({
                       const isPk = col.is_primary_key;
                       const isBool = col.data_type === "boolean" || col.data_type === "bool";
                       const colActive = hoverResizeCol === ci || resizingCol === ci;
+                      const isSaved =
+                        savedCell?.rowIdx === vRow.index && savedCell?.colName === col.name;
 
                       return (
                         <td
                           key={col.name}
+                          className={isSaved ? "flash-save" : undefined}
+                          onAnimationEnd={() => { if (isSaved) setSavedCell(null); }}
                           onDoubleClick={() => hasPk && !isPk && startEdit(vRow.index, col.name, val)}
                           style={{
                             width: adjustedWidths[ci] ?? COL_MIN,
@@ -517,6 +526,30 @@ export default function DataGrid({
               )}
             </tbody>
           </table>
+
+          {loading && rows.length === 0 && (
+            <div
+              style={{
+                position: "absolute", left: 0, right: 0, top: 34,
+                padding: "0", pointerEvents: "none",
+              }}
+            >
+              {Array.from({ length: 14 }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    height: ROW_H, display: "flex", alignItems: "center",
+                    padding: "0 14px", borderBottom: "1px solid var(--border)",
+                  }}
+                >
+                  <div
+                    className="skeleton"
+                    style={{ height: 12, width: `${38 + ((i * 23) % 46)}%`, opacity: Math.max(0.15, 1 - i * 0.07) }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {hasPk && (
@@ -542,6 +575,12 @@ export default function DataGrid({
               (e.currentTarget as HTMLElement).style.background = "#5b9cf6";
               (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
               (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(91,156,246,0.35)";
+            }}
+            onMouseDown={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(0.95)";
+            }}
+            onMouseUp={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "translateY(-1px) scale(1)";
             }}
           >
             <Plus size={11} /> New row

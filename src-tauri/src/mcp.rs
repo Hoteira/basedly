@@ -14,16 +14,12 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::db::{self, DbManager};
 use crate::AppState;
 
-// ── State ──────────────────────────────────────────────────────────────────────
-
 #[derive(Clone)]
 pub struct McpState {
     pub db: Arc<DbManager>,
     pub app_handle: AppHandle,
     pub current_agent: Arc<Mutex<String>>,
 }
-
-// ── Public entry point ─────────────────────────────────────────────────────────
 
 pub async fn start(state: McpState, port: u16) {
     let app = Router::new()
@@ -42,8 +38,6 @@ pub async fn start(state: McpState, port: u16) {
     }
 }
 
-// ── HTTP handler ───────────────────────────────────────────────────────────────
-
 async fn handle_mcp(
     State(state): State<McpState>,
     method: Method,
@@ -56,8 +50,7 @@ async fn handle_mcp(
     }
 
     if method == Method::GET {
-        // We don't support server-initiated SSE on the MCP endpoint —
-        // events flow to the frontend via Tauri's emit() instead.
+        // no server-initiated SSE here, events go to the frontend via Tauri emit()
         return (StatusCode::METHOD_NOT_ALLOWED, cors, Json(Value::Null)).into_response();
     }
 
@@ -103,8 +96,6 @@ fn cors_headers() -> HeaderMap {
     h
 }
 
-// ── JSON-RPC types ─────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct JsonRpcRequest {
     #[allow(dead_code)]
@@ -148,8 +139,6 @@ fn ok_response(id: Option<Value>, result: Value) -> JsonRpcResponse {
         error: None,
     }
 }
-
-// ── Dispatch ───────────────────────────────────────────────────────────────────
 
 async fn dispatch(state: McpState, req: JsonRpcRequest) -> JsonRpcResponse {
     let id = req.id.clone();
@@ -199,8 +188,6 @@ async fn dispatch(state: McpState, req: JsonRpcRequest) -> JsonRpcResponse {
         _ => error_response(id, -32601, format!("Method not found: {}", req.method)),
     }
 }
-
-// ── Tool definitions ───────────────────────────────────────────────────────────
 
 fn tool_definitions() -> Value {
     json!([
@@ -286,8 +273,6 @@ fn tool_definitions() -> Value {
     ])
 }
 
-// ── Tool dispatch ──────────────────────────────────────────────────────────────
-
 async fn dispatch_tool(state: &McpState, name: &str, args: Value) -> Result<String, String> {
     match name {
         "describe_app" => Ok(describe_app_text().to_string()),
@@ -314,8 +299,6 @@ fn describe_app_text() -> &'static str {
      - **update_row** - update a single cell by PK\n\
      - **delete_row** - delete a row by PK"
 }
-
-// ── Tool implementations ───────────────────────────────────────────────────────
 
 async fn list_workspaces(state: &McpState) -> Result<String, String> {
     let app_state = state.app_handle.state::<AppState>();
@@ -428,7 +411,7 @@ async fn update_row_tool(state: &McpState, args: Value) -> Result<String, String
 
     ensure_connected(state, &ws_id).await?;
 
-    // Capture old value before update for undo
+    // capture old value for undo
     let old_row = state
         .db
         .fetch_row_by_column(&ws_id, &table, &pk_col, &pk_val)
@@ -511,8 +494,6 @@ async fn delete_row_tool(state: &McpState, args: Value) -> Result<String, String
     Ok("Row deleted successfully.".to_string())
 }
 
-// ── Event broadcasting ─────────────────────────────────────────────────────────
-
 struct McpEvent<'a> {
     event_type: &'static str,
     workspace_id: &'a str,
@@ -534,8 +515,6 @@ fn broadcast(state: &McpState, event: McpEvent) {
     });
     let _ = state.app_handle.emit("mcp-event", payload);
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
 
 fn str_arg(args: &Value, key: &str) -> Result<String, String> {
     args.get(key)
@@ -630,7 +609,7 @@ async fn build_undo_sql(
 ) -> Option<String> {
     if event_type == "delete" {
         let table = table?;
-        // Replace leading "DELETE FROM" with "SELECT * FROM" to capture deleted rows
+        // swap DELETE FROM for SELECT * to capture deleted rows
         let upper = sql.trim_start().to_uppercase();
         if !upper.starts_with("DELETE FROM") { return None; }
         let select_sql = format!("SELECT * FROM {}", &sql.trim_start()[12..]);

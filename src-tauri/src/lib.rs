@@ -13,8 +13,6 @@ pub struct AppState {
     pub app_config: Mutex<config::AppConfig>,
 }
 
-// ── Workspace management ───────────────────────────────────────────────────────
-
 #[tauri::command]
 async fn get_workspaces(state: State<'_, AppState>) -> Result<Vec<config::WorkspaceConfig>, String> {
     Ok(state.app_config.lock().map_err(|e| e.to_string())?.workspaces.clone())
@@ -100,8 +98,6 @@ async fn is_connected(
     Ok(state.db_manager.is_connected(&workspace_id))
 }
 
-// ── Schema & data ──────────────────────────────────────────────────────────────
-
 #[tauri::command]
 async fn get_schema(
     state: State<'_, AppState>,
@@ -184,8 +180,6 @@ async fn fetch_row_by_column(
         .await
 }
 
-// ── MCP server management ─────────────────────────────────────────────────────
-
 #[tauri::command]
 async fn run_mcp_list(cli: String) -> Result<String, String> {
     #[cfg(windows)]
@@ -229,8 +223,6 @@ async fn run_mcp_add(cli: String, name: String, url: String) -> Result<String, S
     }
 }
 
-// ── File picker for SQLite ─────────────────────────────────────────────────────
-
 #[tauri::command]
 fn pick_sqlite_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
@@ -246,8 +238,6 @@ fn pick_sqlite_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
 async fn save_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
-
-// ── Entry point ────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

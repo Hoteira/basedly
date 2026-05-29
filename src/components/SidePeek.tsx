@@ -62,7 +62,7 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
 
   const isOpen = row !== null;
 
-  // Reset stack whenever a new root row is opened
+  // reset on new root row
   useEffect(() => { setStack([]); setEditingField(null); }, [row]);
 
   useEffect(() => {
@@ -121,8 +121,18 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
     finally { setFkLoading(null); }
   };
 
-  // Breadcrumb: root table → fk table → ...
+  // breadcrumb: root then fk tables
   const breadcrumb: string[] = [tableName, ...stack.map(e => e.tableName)];
+
+  // row identity, remounts the field list to replay the reveal. null when closed.
+  const peekKey = !row
+    ? "empty"
+    : breadcrumb.join(">") +
+      "#" +
+      current.columns
+        .filter((c) => c.is_primary_key)
+        .map((c) => String(current.row[c.name]))
+        .join("-");
 
   return (
     <>
@@ -160,8 +170,8 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
           <button className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={onClose}><X size={14} /></button>
         </div>
 
-        <div style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>
-          {row && current.columns.map(col => {
+        <div key={peekKey} style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>
+          {row && current.columns.map((col, fieldIdx) => {
             const val = current.row[col.name];
             const isPk = col.is_primary_key;
             const isBool = col.data_type === "boolean" || col.data_type === "bool";
@@ -170,7 +180,15 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
             const fkKey = col.foreign_key ? `${col.foreign_key.foreign_table}.${col.foreign_key.foreign_column}` : null;
 
             return (
-              <div key={col.name} style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)" }}>
+              <div
+                key={col.name}
+                className="field-reveal"
+                style={{
+                  padding: "10px 16px",
+                  borderBottom: "1px solid var(--border)",
+                  "--stagger-i": fieldIdx,
+                } as React.CSSProperties}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-2)" }}>{col.name}</span>
                   {isPk && <span style={{ fontSize: 9, color: "var(--yellow)", fontWeight: 700 }}>PK</span>}
@@ -195,16 +213,17 @@ export default function SidePeek({ row, columns, tableName, workspaceId, schema,
                   )}
 
                   <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                    <button onClick={() => copy(val, col.name)} title="Copy" style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === col.name ? "var(--green)" : "var(--text-3)", padding: "2px 4px", display: "flex", alignItems: "center" }}>
-                      {copied === col.name ? <Check size={11} /> : <Copy size={11} />}
+                    <button className="tactile" onClick={() => copy(val, col.name)} title="Copy" style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === col.name ? "var(--green)" : "var(--text-3)", padding: "2px 4px", display: "flex", alignItems: "center" }}>
+                      {copied === col.name ? <Check size={11} className="check-pop" /> : <Copy size={11} />}
                     </button>
                     {!isPk && !isBool && !isJson && (
                       <button
+                        className="tactile"
                         onClick={() => isEditing ? commitEdit(col) : startEdit(col, val)}
                         title={isEditing ? "Save" : "Edit"}
                         style={{ background: "transparent", border: "none", cursor: "pointer", color: isEditing ? "var(--green)" : "var(--text-3)", padding: "2px 4px", display: "flex", alignItems: "center" }}
                       >
-                        {isEditing ? <Check size={11} /> : <Pencil size={11} />}
+                        {isEditing ? <Check size={11} className="check-pop" /> : <Pencil size={11} />}
                       </button>
                     )}
                   </div>
