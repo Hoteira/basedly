@@ -1,6 +1,6 @@
 [package]
 name = "basedly"
-version = "0.1.0"
+version = "0.1.1"
 description = "The No-Nonsense, Local-First Database Workspace"
 authors = ["Hoteira"]
 edition = "2021"

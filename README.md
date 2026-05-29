@@ -70,8 +70,8 @@ npm run tauri build
 
 after `tauri build` you'll find:
 
-- raw exe: `src-tauri/target/release/basedly.exe` (or `basedly` on linux)
-- installers: `src-tauri/target/release/bundle/` (msi/nsis on windows, deb/rpm/AppImage on linux)
+- raw exe: `target/release/basedly.exe` (or `basedly` on linux)
+- installers: `target/release/bundle/` (msi/nsis on windows, deb/rpm/AppImage on linux)
 
 for the Claude integration add this to claude desktop config or whatever MCP thing you use (or you can just use the GUI's menu):
 
